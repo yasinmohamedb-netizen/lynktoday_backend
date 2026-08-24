@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <h2>expimp Live Trade Room Sandbox</h2>
+    <button onclick="joinRoom()">1. Join Trade Room</button>
+    <button onclick="sendMessage()">2. Send Instant Trade Msg</button>
+    
+    <script>
+        const socket = io('http://localhost:5001');
+
+        socket.on('connect', () => console.log('Connected to expimp socket pool!'));
+
+        function joinRoom() {
+            socket.emit('join_room', 'room_guntur_chilli_123');
+        }
+
+        function sendMessage() {
+            socket.emit('send_message', {
+                inquiryRoomId: 'room_guntur_chilli_123',
+                message: "Hello! We accept your FOB pricing offer. Sending contract draft."
+            });
+        }
+
+        socket.on('receive_message', (data) => {
+            alert('New Real-Time Message Received: ' + data.message);
+        });
+    </script>
+</body>
+</html>
