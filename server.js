@@ -64,42 +64,113 @@ const server =
     http.createServer(app);
 
 // ==========================================
-// Frontend URL
+// FRONTEND URLS
 // ==========================================
 
-const frontendUrl =
-    process.env.FRONTEND_URL ||
-    "http://localhost:3000";
+const allowedOrigins = [
+
+    // Local development
+    "http://localhost:3000",
+
+    // Vercel deployment
+    "https://lynktoday-frontend.vercel.app",
+
+    // Production domain
+    "https://www.lynktoday.com"
+
+];
 
 // ==========================================
-// Socket.IO
+// CORS OPTIONS
 // ==========================================
 
-const io = new Server(server, {
+const corsOptions = {
 
-    cors: {
+    origin: function (
+        origin,
+        callback
+    ) {
 
-        origin: frontendUrl,
+        // Allow requests that do not contain
+        // an Origin header.
+        //
+        // This is useful for server-to-server
+        // requests, health checks, etc.
 
-        methods: [
-            "GET",
-            "POST",
-            "PUT",
-            "PATCH",
-            "DELETE"
-        ],
+        if (!origin) {
 
-        credentials: true
+            return callback(
+                null,
+                true
+            );
+
+        }
+
+        // Allow known frontend origins
+
+        if (
+            allowedOrigins.includes(origin)
+        ) {
+
+            return callback(
+                null,
+                true
+            );
+
+        }
+
+        // Reject unknown origins
+
+        return callback(
+            new Error(
+                "Not allowed by CORS"
+            )
+        );
+
+    },
+
+    methods: [
+
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "OPTIONS"
+
+    ],
+
+    allowedHeaders: [
+
+        "Content-Type",
+        "Authorization"
+
+    ],
+
+    credentials: true
+
+};
+
+// ==========================================
+// SOCKET.IO
+// ==========================================
+
+const io = new Server(
+    server,
+    {
+        cors: corsOptions
     }
-
-});
+);
 
 // ==========================================
 // Make Socket.IO Available
 // To Controllers
 // ==========================================
 
-app.set("io", io);
+app.set(
+    "io",
+    io
+);
 
 // ==========================================
 // Security
@@ -114,26 +185,9 @@ app.use(
 // ==========================================
 
 app.use(
-    cors({
-
-        origin: frontendUrl,
-
-        methods: [
-            "GET",
-            "POST",
-            "PUT",
-            "PATCH",
-            "DELETE",
-            "OPTIONS"
-        ],
-
-        allowedHeaders: [
-            "Content-Type",
-            "Authorization"
-        ],
-
-        credentials: true
-    })
+    cors(
+        corsOptions
+    )
 );
 
 // ==========================================
@@ -198,108 +252,126 @@ app.use(
 // ==========================================
 
 // HS Codes
+
 app.use(
     "/api/v1/hs-codes",
     hsCodeRoutes
 );
 
 // Profile
+
 app.use(
     "/api/v1/profile",
     profileRoutes
 );
 
 // Questions
+
 app.use(
     "/api/v1/questions",
     questionRoutes
 );
 
 // Search
+
 app.use(
     "/api/v1/search",
     searchRoutes
 );
 
 // Documentation
+
 app.use(
     "/api/v1/documentation",
     documentationRoutes
 );
 
 // Topics
+
 app.use(
     "/api/v1/topics",
     topicRoutes
 );
 
 // Follow
+
 app.use(
     "/api/v1/follow",
     followRoutes
 );
 
 // Authentication
+
 app.use(
     "/api/v1/auth",
     authRoutes
 );
 
 // Posts
+
 app.use(
     "/api/v1/posts",
     postRoutes
 );
 
 // Messages
+
 app.use(
     "/api/v1/messages",
     messageRoutes
 );
 
 // Connections
+
 app.use(
     "/api/v1/connections",
     connectionRoutes
 );
 
 // Users
+
 app.use(
     "/api/v1/users",
     userRoutes
 );
 
 // Sidebar Content
+
 app.use(
     "/api/v1",
     sidebarContentRoutes
 );
 
 // Comments
+
 app.use(
     "/api/v1/comments",
     commentRoutes
 );
 
 // Notifications
+
 app.use(
     "/api/v1/notifications",
     notificationRoutes
 );
 
 // Right Sidebar
+
 app.use(
     "/api/v1/right-sidebar",
     rightSidebarRoutes
 );
 
 // Admin Highlights
+
 app.use(
     "/api/v1/admin/highlights",
     adminHighlightRoutes
 );
 
 // Admin Sidebar
+
 app.use(
     "/api/v1/admin/sidebar",
     adminSidebarRoutes
@@ -399,6 +471,7 @@ io.on(
             (roomId) => {
 
                 if (!roomId) {
+
                     return;
                 }
 
@@ -422,6 +495,7 @@ io.on(
             (roomId) => {
 
                 if (!roomId) {
+
                     return;
                 }
 
@@ -445,10 +519,12 @@ io.on(
             (data) => {
 
                 if (!data) {
+
                     return;
                 }
 
                 if (!data.receiverId) {
+
                     return;
                 }
 
@@ -480,6 +556,7 @@ io.on(
             (messageData) => {
 
                 if (!messageData) {
+
                     return;
                 }
 
@@ -489,6 +566,7 @@ io.on(
                     messageData.conversationId;
 
                 if (!roomId) {
+
                     return;
                 }
 
@@ -511,6 +589,7 @@ io.on(
             (data) => {
 
                 if (!data) {
+
                     return;
                 }
 
@@ -520,6 +599,7 @@ io.on(
                     data.conversationId;
 
                 if (!roomId) {
+
                     return;
                 }
 
@@ -542,6 +622,7 @@ io.on(
             (data) => {
 
                 if (!data) {
+
                     return;
                 }
 
@@ -551,6 +632,7 @@ io.on(
                     data.conversationId;
 
                 if (!roomId) {
+
                     return;
                 }
 
@@ -573,6 +655,7 @@ io.on(
             (data) => {
 
                 if (!data) {
+
                     return;
                 }
 
@@ -582,6 +665,7 @@ io.on(
                     data.conversationId;
 
                 if (!roomId) {
+
                     return;
                 }
 
@@ -604,6 +688,7 @@ io.on(
             (data) => {
 
                 if (!data) {
+
                     return;
                 }
 
@@ -613,6 +698,7 @@ io.on(
                     data.conversationId;
 
                 if (!roomId) {
+
                     return;
                 }
 
@@ -635,6 +721,7 @@ io.on(
             (data) => {
 
                 if (!data) {
+
                     return;
                 }
 
@@ -644,6 +731,7 @@ io.on(
                     data.conversationId;
 
                 if (!roomId) {
+
                     return;
                 }
 
@@ -712,7 +800,8 @@ connectDB()
                     );
 
                     console.log(
-                        `Frontend URL: ${frontendUrl}`
+                        "Allowed Frontend Origins:",
+                        allowedOrigins
                     );
 
                     console.log(
