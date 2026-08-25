@@ -3,7 +3,7 @@ const AdminHighlight =
 
 
 // ======================================================
-// CREATE
+// CREATE ADMIN HIGHLIGHT
 // POST /api/v1/admin/highlights
 // ======================================================
 
@@ -16,7 +16,6 @@ exports.createHighlight = async (
     try {
 
         const {
-
             title,
             description,
             type,
@@ -25,7 +24,6 @@ exports.createHighlight = async (
             priority,
             startDate,
             endDate
-
         } = req.body;
 
 
@@ -38,9 +36,19 @@ exports.createHighlight = async (
 
                 type,
 
-                link,
+                /*
+                 * Keep the manually supplied link for
+                 * backwards compatibility.
+                 *
+                 * Industry News will generate its own
+                 * /news/:id link in rightSidebarController.
+                 */
 
-                imageUrl,
+                link:
+                    link || "",
+
+                imageUrl:
+                    imageUrl || "",
 
                 priority:
                     Number(priority) || 0,
@@ -125,7 +133,42 @@ exports.getHighlights = async (
 
 
 // ======================================================
-// UPDATE
+// GET SINGLE ADMIN HIGHLIGHT
+// GET /api/v1/admin/highlights/:id
+// ======================================================
+
+exports.getHighlightById = async (
+    req,
+    res,
+    next
+) => {
+    try {
+        const highlight =
+            await AdminHighlight.findById(
+                req.params.id
+            ).populate(
+                "createdBy",
+                "fullName"
+            );
+
+        if (!highlight) {
+            return res.status(404).json({
+                success: false,
+                message: "Highlight not found."
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            highlight
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+// ======================================================
+// UPDATE ADMIN HIGHLIGHT
 // PATCH /api/v1/admin/highlights/:id
 // ======================================================
 
@@ -180,19 +223,21 @@ exports.updateHighlight = async (
         ];
 
 
-        allowedFields.forEach(field => {
+        allowedFields.forEach(
+            (field) => {
 
-            if (
-                req.body[field] !==
-                undefined
-            ) {
+                if (
+                    req.body[field] !==
+                    undefined
+                ) {
 
-                highlight[field] =
-                    req.body[field];
+                    highlight[field] =
+                        req.body[field];
+
+                }
 
             }
-
-        });
+        );
 
 
         await highlight.save();
@@ -216,7 +261,7 @@ exports.updateHighlight = async (
 
 
 // ======================================================
-// DELETE
+// DELETE ADMIN HIGHLIGHT
 // DELETE /api/v1/admin/highlights/:id
 // ======================================================
 

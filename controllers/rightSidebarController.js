@@ -1289,54 +1289,51 @@ exports.getRightSidebar = async (
         // ==================================================
 
         const adminNews =
+    adminHighlights.map(
+        (highlight) => ({
+            _id: highlight._id,
 
-            adminHighlights.map(
-                highlight => ({
+            type: "ADMIN_NEWS",
 
-                    _id:
-                        highlight._id,
+            source: "ADMIN",
 
-                    type:
-                        "ADMIN_NEWS",
+            title:
+                highlight.title,
 
-                    source:
-                        "ADMIN",
+            description:
+                highlight.description || "",
 
-                    title:
-                        highlight.title,
+            category:
+                "Industry News",
 
-                    description:
-                        highlight.description ||
-                        "",
+            highlightType:
+                highlight.type,
 
-                    category:
-                        "Industry News",
+            imageUrl:
+                highlight.imageUrl || "",
 
-                    highlightType:
-                        highlight.type,
+            priority:
+                Number(
+                    highlight.priority
+                ) || 0,
 
-                    imageUrl:
-                        highlight.imageUrl ||
-                        "",
+            createdBy:
+                highlight.createdBy,
 
-                    priority:
-                        Number(
-                            highlight.priority
-                        ) || 0,
+            createdAt:
+                highlight.createdAt,
 
-                    createdBy:
-                        highlight.createdBy,
-
-                    createdAt:
-                        highlight.createdAt,
-
-                    link:
-                        highlight.link ||
-                        null
-
-                })
-            );
-
+            /*
+             * ADMIN NEWS
+             *
+             * Always open the
+             * individual admin news
+             * page.
+             */
+            link:
+                `/news/${highlight._id}`
+        })
+    );
 
         // ==================================================
         // 8. COMBINE INDUSTRY NEWS

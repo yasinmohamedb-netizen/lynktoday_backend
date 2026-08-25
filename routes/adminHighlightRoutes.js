@@ -32,9 +32,18 @@ router.post(
 
 router.get(
     "/",
-    protect,
-    adminOnly,
     controller.getHighlights
+);
+
+
+// ======================================================
+// GET SINGLE ADMIN HIGHLIGHT
+// GET /api/v1/admin/highlights/:id
+// ======================================================
+
+router.get(
+    "/:id",
+    controller.getHighlightById
 );
 
 
@@ -63,9 +72,5 @@ router.delete(
     controller.deleteHighlight
 );
 
-
-// ======================================================
-// EXPORT
-// ======================================================
 
 module.exports = router;
