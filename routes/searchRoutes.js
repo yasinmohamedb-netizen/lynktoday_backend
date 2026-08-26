@@ -10,10 +10,14 @@ const {
     optionalAuth
 } = require("../middleware/authMiddleware");
 
+
 // ======================================================
 // GLOBAL SEARCH
 //
 // GET /api/v1/search?q=cotton
+//
+// Public search
+// Authentication is optional
 // ======================================================
 
 router.get(
@@ -21,5 +25,6 @@ router.get(
     optionalAuth,
     globalSearch
 );
+
 
 module.exports = router;

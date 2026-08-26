@@ -1,7 +1,15 @@
-const User = require("../models/User");
-const Post = require("../models/Post");
-const HSCode = require("../models/HSCode");
-const Documentation = require("../models/Documentation");
+const User =
+    require("../models/User");
+
+const Post =
+    require("../models/Post");
+
+const HSCode =
+    require("../models/HSCode");
+
+const Documentation =
+    require("../models/Documentation");
+
 
 // ======================================================
 // GLOBAL SEARCH
@@ -17,9 +25,17 @@ const Documentation = require("../models/Documentation");
 // - Documentation
 // ======================================================
 
-exports.globalSearch = async (req, res, next) => {
+exports.globalSearch = async (
+    req,
+    res,
+    next
+) => {
 
     try {
+
+        // ==================================================
+        // QUERY
+        // ==================================================
 
         const q =
             typeof req.query.q === "string"
@@ -27,18 +43,42 @@ exports.globalSearch = async (req, res, next) => {
                 : "";
 
 
-        const limit = Math.min(
-            Math.max(
-                parseInt(req.query.limit, 10) || 10,
-                1
-            ),
-            20
-        );
+        // ==================================================
+        // LIMIT
+        // ==================================================
+
+        const limit =
+            Math.min(
+                Math.max(
+                    parseInt(
+                        req.query.limit,
+                        10
+                    ) || 20,
+                    1
+                ),
+                20
+            );
 
 
-        // ======================================================
-        // VALIDATE QUERY
-        // ======================================================
+        // ==================================================
+        // VALIDATE
+        // ==================================================
+
+        /*
+         * IMPORTANT:
+         *
+         * Do NOT require 2 characters.
+         *
+         * Searches such as:
+         *
+         * 6
+         * 8
+         * 10
+         * a
+         * b
+         *
+         * should work.
+         */
 
         if (!q) {
 
@@ -54,23 +94,9 @@ exports.globalSearch = async (req, res, next) => {
         }
 
 
-        if (q.length < 2) {
-
-            return res.status(400).json({
-
-                success: false,
-
-                message:
-                    "Search query must contain at least 2 characters."
-
-            });
-
-        }
-
-
-        // ======================================================
-        // ESCAPE REGEX
-        // ======================================================
+        // ==================================================
+        // REGEX
+        // ==================================================
 
         const escapedQuery =
             q.replace(
@@ -86,9 +112,9 @@ exports.globalSearch = async (req, res, next) => {
             );
 
 
-        // ======================================================
-        // USER SEARCH
-        // ======================================================
+        // ==================================================
+        // USERS
+        // ==================================================
 
         const users =
             await User.find({
@@ -130,9 +156,11 @@ exports.globalSearch = async (req, res, next) => {
                 ]
 
             })
+
                 .select(
                     "_id fullName companyName profession designation headline location profileImage isVerified followersCount"
                 )
+
                 .sort({
 
                     isVerified: -1,
@@ -140,13 +168,15 @@ exports.globalSearch = async (req, res, next) => {
                     followersCount: -1
 
                 })
+
                 .limit(limit)
+
                 .lean();
 
 
-        // ======================================================
-        // POST SEARCH
-        // ======================================================
+        // ==================================================
+        // POSTS
+        // ==================================================
 
         const posts =
             await Post.find({
@@ -178,28 +208,30 @@ exports.globalSearch = async (req, res, next) => {
                 ]
 
             })
+
                 .populate(
                     "author",
                     "fullName profileImage profession companyName isVerified"
                 )
+
                 .select(
                     "_id title content postType category tags author createdAt commentCount shareCount views isSolved"
                 )
+
                 .sort({
 
                     createdAt: -1
 
                 })
+
                 .limit(limit)
+
                 .lean();
 
 
-        // ======================================================
-        // QUESTION SEARCH
-        //
-        // Questions are Posts where:
-        // postType = "QUESTION"
-        // ======================================================
+        // ==================================================
+        // QUESTIONS
+        // ==================================================
 
         const questions =
             await Post.find({
@@ -233,25 +265,30 @@ exports.globalSearch = async (req, res, next) => {
                 ]
 
             })
+
                 .populate(
                     "author",
                     "fullName profileImage profession companyName isVerified"
                 )
+
                 .select(
                     "_id title content postType category tags author createdAt commentCount isSolved acceptedAnswer"
                 )
+
                 .sort({
 
                     createdAt: -1
 
                 })
+
                 .limit(limit)
+
                 .lean();
 
 
-        // ======================================================
-        // HS CODE SEARCH
-        // ======================================================
+        // ==================================================
+        // HS CODES
+        // ==================================================
 
         const hsCodes =
             await HSCode.find({
@@ -260,31 +297,37 @@ exports.globalSearch = async (req, res, next) => {
 
                 $or: [
 
+                    // Exact / partial HS code
                     {
                         hsCode:
                             searchRegex
                     },
 
+                    // Description
                     {
                         description:
                             searchRegex
                     },
 
+                    // Keywords
                     {
                         keywords:
                             searchRegex
                     },
 
+                    // Chapter
                     {
                         chapter:
                             searchRegex
                     },
 
+                    // Heading
                     {
                         heading:
                             searchRegex
                     },
 
+                    // Sub heading
                     {
                         subHeading:
                             searchRegex
@@ -293,21 +336,25 @@ exports.globalSearch = async (req, res, next) => {
                 ]
 
             })
+
                 .select(
                     "_id hsCode description section sectionNumber chapter chapterNumber heading subHeading unit basicDuty igst cess importPolicy exportPolicy country notes keywords isActive"
                 )
+
                 .sort({
 
                     hsCode: 1
 
                 })
+
                 .limit(limit)
+
                 .lean();
 
 
-        // ======================================================
-        // DOCUMENTATION SEARCH
-        // ======================================================
+        // ==================================================
+        // DOCUMENTATION
+        // ==================================================
 
         const documentation =
             await Documentation.find({
@@ -354,9 +401,11 @@ exports.globalSearch = async (req, res, next) => {
                 ]
 
             })
+
                 .select(
                     "_id title description documentType category content fileUrl fileName fileType fileSize tags relatedHSCode hsCode createdBy updatedBy isActive isFeatured views createdAt updatedAt"
                 )
+
                 .sort({
 
                     isFeatured: -1,
@@ -364,82 +413,85 @@ exports.globalSearch = async (req, res, next) => {
                     createdAt: -1
 
                 })
+
                 .limit(limit)
+
                 .lean();
 
 
-        // ======================================================
+        // ==================================================
         // COMPANIES
-        // ======================================================
+        // ==================================================
 
         const companiesMap =
             new Map();
 
 
-        users.forEach((user) => {
-
-            if (
-                user.companyName &&
-                user.companyName.trim()
-            ) {
-
-                const companyName =
-                    user.companyName.trim();
-
-
-                const key =
-                    companyName.toLowerCase();
-
+        users.forEach(
+            (user) => {
 
                 if (
-                    !companiesMap.has(key)
+                    user.companyName &&
+                    user.companyName.trim()
                 ) {
 
-                    companiesMap.set(
-                        key,
-                        {
+                    const companyName =
+                        user.companyName.trim();
 
-                            companyName,
 
-                            location:
-                                user.location ||
-                                "",
+                    const key =
+                        companyName.toLowerCase();
 
-                            profession:
-                                user.profession ||
-                                "",
 
-                            profileImage:
-                                user.profileImage ||
-                                "",
+                    if (
+                        !companiesMap.has(key)
+                    ) {
 
-                            isVerified:
-                                user.isVerified ||
-                                false
+                        companiesMap.set(
+                            key,
+                            {
 
-                        }
-                    );
+                                companyName,
+
+                                location:
+                                    user.location ||
+                                    "",
+
+                                profession:
+                                    user.profession ||
+                                    "",
+
+                                profileImage:
+                                    user.profileImage ||
+                                    "",
+
+                                isVerified:
+                                    user.isVerified ||
+                                    false
+
+                            }
+                        );
+
+                    }
 
                 }
 
             }
-
-        });
+        );
 
 
         const companies =
             Array.from(
                 companiesMap.values()
-            )
-                .slice(
-                    0,
-                    limit
-                );
+            ).slice(
+                0,
+                limit
+            );
 
 
-        // ======================================================
+        // ==================================================
         // RESPONSE
-        // ======================================================
+        // ==================================================
 
         return res.status(200).json({
 
@@ -467,6 +519,11 @@ exports.globalSearch = async (req, res, next) => {
 
 
     } catch (error) {
+
+        console.error(
+            "Global search controller error:",
+            error
+        );
 
         next(error);
 
