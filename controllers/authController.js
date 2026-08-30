@@ -1,71 +1,42 @@
 const User = require("../models/User");
-
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const nodemailer = require("nodemailer");
 
 // ============================================================
-// EMAIL TRANSPORTER - GMAIL OAUTH 2.0
+// GMAIL API EMAIL SERVICE
 // ============================================================
 
-const transporter = nodemailer.createTransport({
+const { sendEmail } = require("../services/emailService");
 
-    service: "gmail",
+// ============================================================
+// CONSTANTS
+// ============================================================
 
-    auth: {
+const FROM_EMAIL = "lynktodayinfo@gmail.com";
+const FROM_NAME = "LynkToday";
 
-        type: "OAuth2",
-
-        user:
-            process.env.EMAIL_USER,
-
-        clientId:
-            process.env.GOOGLE_CLIENT_ID,
-
-        clientSecret:
-            process.env.GOOGLE_CLIENT_SECRET,
-
-        refreshToken:
-            process.env.GOOGLE_REFRESH_TOKEN
-
-    }
-
-});
+const OTP_EXPIRY_MINUTES = 10;
+const OTP_COOLDOWN_SECONDS = 60;
+const MAX_OTP_ATTEMPTS = 5;
 
 // ============================================================
 // GENERATE JWT
 // ============================================================
 
 const generateToken = (user) => {
-
     return jwt.sign(
-
         {
-            userId:
-                user._id,
-
-            role:
-                user.role,
-
-            isVerified:
-                user.isVerified,
-
-            verificationStatus:
-                user.verificationStatus,
-
-            emailVerified:
-                user.emailVerified
-
+            userId: user._id,
+            role: user.role,
+            isVerified: user.isVerified,
+            verificationStatus: user.verificationStatus,
+            emailVerified: user.emailVerified
         },
-
         process.env.JWT_SECRET,
-
         {
             expiresIn: "30d"
         }
-
     );
-
 };
 
 // ============================================================
@@ -73,14 +44,9 @@ const generateToken = (user) => {
 // ============================================================
 
 const generateOtp = () => {
-
     return crypto
-        .randomInt(
-            100000,
-            1000000
-        )
+        .randomInt(100000, 1000000)
         .toString();
-
 };
 
 // ============================================================
@@ -88,12 +54,10 @@ const generateOtp = () => {
 // ============================================================
 
 const hashOtp = (otp) => {
-
     return crypto
         .createHash("sha256")
-        .update(otp)
+        .update(String(otp))
         .digest("hex");
-
 };
 
 // ============================================================
@@ -101,11 +65,22 @@ const hashOtp = (otp) => {
 // ============================================================
 
 const normalizeEmail = (email) => {
-
     return String(email || "")
         .trim()
         .toLowerCase();
+};
 
+// ============================================================
+// ESCAPE HTML
+// ============================================================
+
+const escapeHtml = (value = "") => {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 };
 
 // ============================================================
@@ -118,97 +93,114 @@ const sendVerificationEmail = async (
     otp
 ) => {
 
-    await transporter.sendMail({
+    const safeName =
+        escapeHtml(fullName || "there");
 
-        from:
-            `"LynkToday" <${process.env.EMAIL_USER}>`,
+    const safeOtp =
+        escapeHtml(otp);
 
-        to:
-            email,
+    await sendEmail({
+
+        to: email,
 
         subject:
             "Verify your LynkToday email",
 
+        text: `
+Welcome to LynkToday
+
+Hi ${fullName || "there"},
+
+Thank you for creating your LynkToday account.
+
+Please use the OTP below to verify your email address:
+
+${otp}
+
+This OTP will expire in 10 minutes.
+
+If you did not create this account, you can safely ignore this email.
+
+© LynkToday. All rights reserved.
+        `.trim(),
+
         html: `
+<div style="
+    font-family: Arial, sans-serif;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 30px;
+    color: #1f2937;
+    background: #ffffff;
+">
 
-            <div style="
-                font-family: Arial, sans-serif;
-                max-width: 600px;
-                margin: 0 auto;
-                padding: 30px;
-                color: #1f2937;
-            ">
+    <h2 style="
+        color: #4B5563;
+        margin-bottom: 20px;
+    ">
+        Welcome to LynkToday
+    </h2>
 
-                <h2 style="
-                    color: #4B5563;
-                    margin-bottom: 20px;
-                ">
-                    Welcome to LynkToday
-                </h2>
+    <p>
+        Hi ${safeName},
+    </p>
 
-                <p>
-                    Hi ${fullName || "there"},
-                </p>
+    <p>
+        Thank you for creating your LynkToday account.
+    </p>
 
-                <p>
-                    Thank you for creating your LynkToday account.
-                </p>
+    <p>
+        Please use the OTP below to verify your email address:
+    </p>
 
-                <p>
-                    Please use the OTP below to verify your email address:
-                </p>
+    <div style="
+        text-align: center;
+        margin: 30px 0;
+    ">
 
-                <div style="
-                    text-align: center;
-                    margin: 30px 0;
-                ">
+        <span style="
+            display: inline-block;
+            padding: 15px 28px;
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            color: #4B5563;
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: 8px;
+        ">
+            ${safeOtp}
+        </span>
 
-                    <span style="
-                        display: inline-block;
-                        padding: 15px 28px;
-                        background: #f3f4f6;
-                        border: 1px solid #d1d5db;
-                        border-radius: 10px;
-                        color: #4B5563;
-                        font-size: 32px;
-                        font-weight: 700;
-                        letter-spacing: 8px;
-                    ">
-                        ${otp}
-                    </span>
+    </div>
 
-                </div>
+    <p>
+        This OTP will expire in
+        <strong>10 minutes</strong>.
+    </p>
 
-                <p>
-                    This OTP will expire in
-                    <strong>10 minutes</strong>.
-                </p>
+    <p>
+        If you did not create this account,
+        you can safely ignore this email.
+    </p>
 
-                <p>
-                    If you did not create this account,
-                    you can safely ignore this email.
-                </p>
+    <hr style="
+        margin: 30px 0;
+        border: none;
+        border-top: 1px solid #e5e7eb;
+    " />
 
-                <hr style="
-                    margin: 30px 0;
-                    border: none;
-                    border-top: 1px solid #e5e7eb;
-                " />
+    <p style="
+        color: #9ca3af;
+        font-size: 12px;
+        text-align: center;
+    ">
+        © LynkToday. All rights reserved.
+    </p>
 
-                <p style="
-                    color: #9ca3af;
-                    font-size: 12px;
-                    text-align: center;
-                ">
-                    © LynkToday. All rights reserved.
-                </p>
-
-            </div>
-
+</div>
         `
-
     });
-
 };
 
 // ============================================================
@@ -221,97 +213,114 @@ const sendPasswordResetEmail = async (
     otp
 ) => {
 
-    await transporter.sendMail({
+    const safeName =
+        escapeHtml(fullName || "there");
 
-        from:
-            `"LynkToday" <${process.env.EMAIL_USER}>`,
+    const safeOtp =
+        escapeHtml(otp);
 
-        to:
-            email,
+    await sendEmail({
+
+        to: email,
 
         subject:
             "LynkToday password reset OTP",
 
+        text: `
+Reset your LynkToday password
+
+Hi ${fullName || "there"},
+
+We received a request to reset your LynkToday password.
+
+Use the OTP below to continue:
+
+${otp}
+
+This OTP will expire in 10 minutes.
+
+If you did not request a password reset, you can safely ignore this email.
+
+© LynkToday. All rights reserved.
+        `.trim(),
+
         html: `
+<div style="
+    font-family: Arial, sans-serif;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 30px;
+    color: #1f2937;
+    background: #ffffff;
+">
 
-            <div style="
-                font-family: Arial, sans-serif;
-                max-width: 600px;
-                margin: 0 auto;
-                padding: 30px;
-                color: #1f2937;
-            ">
+    <h2 style="
+        color: #4B5563;
+        margin-bottom: 20px;
+    ">
+        Reset your LynkToday password
+    </h2>
 
-                <h2 style="
-                    color: #4B5563;
-                    margin-bottom: 20px;
-                ">
-                    Reset your LynkToday password
-                </h2>
+    <p>
+        Hi ${safeName},
+    </p>
 
-                <p>
-                    Hi ${fullName || "there"},
-                </p>
+    <p>
+        We received a request to reset your LynkToday password.
+    </p>
 
-                <p>
-                    We received a request to reset your LynkToday password.
-                </p>
+    <p>
+        Use the OTP below to continue:
+    </p>
 
-                <p>
-                    Use the OTP below to continue:
-                </p>
+    <div style="
+        text-align: center;
+        margin: 30px 0;
+    ">
 
-                <div style="
-                    text-align: center;
-                    margin: 30px 0;
-                ">
+        <span style="
+            display: inline-block;
+            padding: 15px 28px;
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            color: #4B5563;
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: 8px;
+        ">
+            ${safeOtp}
+        </span>
 
-                    <span style="
-                        display: inline-block;
-                        padding: 15px 28px;
-                        background: #f3f4f6;
-                        border: 1px solid #d1d5db;
-                        border-radius: 10px;
-                        color: #4B5563;
-                        font-size: 32px;
-                        font-weight: 700;
-                        letter-spacing: 8px;
-                    ">
-                        ${otp}
-                    </span>
+    </div>
 
-                </div>
+    <p>
+        This OTP will expire in
+        <strong>10 minutes</strong>.
+    </p>
 
-                <p>
-                    This OTP will expire in
-                    <strong>10 minutes</strong>.
-                </p>
+    <p>
+        If you did not request a password reset,
+        you can safely ignore this email.
+    </p>
 
-                <p>
-                    If you did not request a password reset,
-                    you can safely ignore this email.
-                </p>
+    <hr style="
+        margin: 30px 0;
+        border: none;
+        border-top: 1px solid #e5e7eb;
+    " />
 
-                <hr style="
-                    margin: 30px 0;
-                    border: none;
-                    border-top: 1px solid #e5e7eb;
-                " />
+    <p style="
+        color: #9ca3af;
+        font-size: 12px;
+        text-align: center;
+    ">
+        © LynkToday. All rights reserved.
+    </p>
 
-                <p style="
-                    color: #9ca3af;
-                    font-size: 12px;
-                    text-align: center;
-                ">
-                    © LynkToday. All rights reserved.
-                </p>
-
-            </div>
-
+</div>
         `
-
     });
-
 };
 
 // ============================================================
@@ -359,7 +368,9 @@ exports.signup = async (
 
         }
 
-        if (password.length < 6) {
+        if (
+            password.length < 6
+        ) {
 
             return res.status(400).json({
 
@@ -372,7 +383,9 @@ exports.signup = async (
 
         }
 
-        if (agreeToTerms === false) {
+        if (
+            agreeToTerms === false
+        ) {
 
             return res.status(400).json({
 
@@ -404,26 +417,35 @@ exports.signup = async (
 
         // ------------------------------------------------------
         // EXISTING UNVERIFIED USER
-        //
-        // Instead of creating a duplicate account,
-        // generate a new verification OTP.
         // ------------------------------------------------------
 
-        if (user && !user.emailVerified) {
+        if (
+            user &&
+            !user.emailVerified
+        ) {
 
-            const secondsPassed =
+            let secondsPassed = 999;
+
+            if (
                 user.emailVerificationLastSentAt
-                    ? Math.floor(
+            ) {
+
+                secondsPassed =
+                    Math.floor(
                         (
                             Date.now() -
                             new Date(
                                 user.emailVerificationLastSentAt
                             ).getTime()
                         ) / 1000
-                    )
-                    : 999;
+                    );
 
-            if (secondsPassed < 60) {
+            }
+
+            if (
+                secondsPassed <
+                OTP_COOLDOWN_SECONDS
+            ) {
 
                 return res.status(429).json({
 
@@ -433,7 +455,7 @@ exports.signup = async (
                         "EMAIL_NOT_VERIFIED",
 
                     message:
-                        `An account already exists but is not verified. Please wait ${60 - secondsPassed} seconds before requesting another OTP.`,
+                        `An account already exists but is not verified. Please wait ${OTP_COOLDOWN_SECONDS - secondsPassed} seconds before requesting another OTP.`,
 
                     email:
                         user.email
@@ -451,7 +473,9 @@ exports.signup = async (
             user.emailVerificationOtpExpires =
                 new Date(
                     Date.now() +
-                    10 * 60 * 1000
+                    OTP_EXPIRY_MINUTES *
+                    60 *
+                    1000
                 );
 
             user.emailVerificationAttempts =
@@ -461,6 +485,10 @@ exports.signup = async (
                 new Date();
 
             await user.save();
+
+            // --------------------------------------------------
+            // SEND EMAIL
+            // --------------------------------------------------
 
             try {
 
@@ -474,15 +502,18 @@ exports.signup = async (
 
                 console.error(
                     "Existing user verification email error:",
+                    emailError?.response?.data ||
+                    emailError?.message ||
                     emailError
                 );
-
-                // Clear OTP because email wasn't sent.
 
                 user.emailVerificationOtp =
                     null;
 
                 user.emailVerificationOtpExpires =
+                    null;
+
+                user.emailVerificationLastSentAt =
                     null;
 
                 await user.save();
@@ -587,7 +618,9 @@ exports.signup = async (
                 emailVerificationOtpExpires:
                     new Date(
                         Date.now() +
-                        10 * 60 * 1000
+                        OTP_EXPIRY_MINUTES *
+                        60 *
+                        1000
                     ),
 
                 emailVerificationAttempts:
@@ -605,7 +638,7 @@ exports.signup = async (
         await user.save();
 
         // ------------------------------------------------------
-        // SEND OTP
+        // SEND VERIFICATION EMAIL
         // ------------------------------------------------------
 
         try {
@@ -616,27 +649,27 @@ exports.signup = async (
                 otp
             );
 
+            console.log(
+                "✅ Signup verification email sent:",
+                user.email
+            );
+
         } catch (emailError) {
 
             console.error(
                 "Signup verification email error:",
+                emailError?.response?.data ||
+                emailError?.message ||
                 emailError
             );
-
-            /*
-             * Important:
-             *
-             * We keep the account because the user has
-             * already registered.
-             *
-             * But remove the OTP so an invalid/stale OTP
-             * cannot remain active.
-             */
 
             user.emailVerificationOtp =
                 null;
 
             user.emailVerificationOtpExpires =
+                null;
+
+            user.emailVerificationLastSentAt =
                 null;
 
             await user.save();
@@ -649,7 +682,7 @@ exports.signup = async (
                     "EMAIL_SEND_FAILED",
 
                 message:
-                    "Your account was created, but we could not send the verification email. Please use Resend OTP after a short while.",
+                    "Your account was created, but we could not send the verification email. Please try again.",
 
                 email:
                     user.email
@@ -703,7 +736,10 @@ exports.verifyEmail = async (
             otp
         } = req.body;
 
-        if (!email || !otp) {
+        if (
+            !email ||
+            !otp
+        ) {
 
             return res.status(400).json({
 
@@ -741,7 +777,9 @@ exports.verifyEmail = async (
 
         }
 
-        if (user.emailVerified) {
+        if (
+            user.emailVerified
+        ) {
 
             return res.status(200).json({
 
@@ -761,7 +799,9 @@ exports.verifyEmail = async (
         // OTP EXISTS
         // ------------------------------------------------------
 
-        if (!user.emailVerificationOtp) {
+        if (
+            !user.emailVerificationOtp
+        ) {
 
             return res.status(400).json({
 
@@ -817,7 +857,8 @@ exports.verifyEmail = async (
         // ------------------------------------------------------
 
         if (
-            user.emailVerificationAttempts >= 5
+            user.emailVerificationAttempts >=
+            MAX_OTP_ATTEMPTS
         ) {
 
             return res.status(429).json({
@@ -867,7 +908,7 @@ exports.verifyEmail = async (
         }
 
         // ------------------------------------------------------
-        // VERIFY USER
+        // VERIFY EMAIL
         // ------------------------------------------------------
 
         user.emailVerified =
@@ -905,7 +946,7 @@ exports.verifyEmail = async (
 };
 
 // ============================================================
-// RESEND VERIFICATION
+// RESEND VERIFICATION OTP
 // POST /api/v1/auth/resend-verification
 // ============================================================
 
@@ -960,7 +1001,9 @@ exports.resendVerification = async (
 
         }
 
-        if (user.emailVerified) {
+        if (
+            user.emailVerified
+        ) {
 
             return res.status(400).json({
 
@@ -977,7 +1020,7 @@ exports.resendVerification = async (
         }
 
         // ------------------------------------------------------
-        // RESEND COOLDOWN
+        // COOLDOWN
         // ------------------------------------------------------
 
         if (
@@ -995,7 +1038,8 @@ exports.resendVerification = async (
                 );
 
             if (
-                secondsPassed < 60
+                secondsPassed <
+                OTP_COOLDOWN_SECONDS
             ) {
 
                 return res.status(429).json({
@@ -1003,7 +1047,7 @@ exports.resendVerification = async (
                     success: false,
 
                     message:
-                        `Please wait ${60 - secondsPassed} seconds before requesting another OTP.`
+                        `Please wait ${OTP_COOLDOWN_SECONDS - secondsPassed} seconds before requesting another OTP.`
 
                 });
 
@@ -1011,7 +1055,7 @@ exports.resendVerification = async (
 
         }
 
-            // ------------------------------------------------------
+        // ------------------------------------------------------
         // NEW OTP
         // ------------------------------------------------------
 
@@ -1024,7 +1068,9 @@ exports.resendVerification = async (
         user.emailVerificationOtpExpires =
             new Date(
                 Date.now() +
-                10 * 60 * 1000
+                OTP_EXPIRY_MINUTES *
+                60 *
+                1000
             );
 
         user.emailVerificationAttempts =
@@ -1047,10 +1093,17 @@ exports.resendVerification = async (
                 otp
             );
 
+            console.log(
+                "✅ Verification OTP resent:",
+                user.email
+            );
+
         } catch (emailError) {
 
             console.error(
                 "Resend verification email error:",
+                emailError?.response?.data ||
+                emailError?.message ||
                 emailError
             );
 
@@ -1058,6 +1111,9 @@ exports.resendVerification = async (
                 null;
 
             user.emailVerificationOtpExpires =
+                null;
+
+            user.emailVerificationLastSentAt =
                 null;
 
             await user.save();
@@ -1111,11 +1167,10 @@ exports.login = async (
             password
         } = req.body;
 
-        // ========================================================
-        // VALIDATION
-        // ========================================================
-
-        if (!email || !password) {
+        if (
+            !email ||
+            !password
+        ) {
 
             return res.status(400).json({
 
@@ -1128,18 +1183,8 @@ exports.login = async (
 
         }
 
-        // ========================================================
-        // NORMALIZE EMAIL
-        // ========================================================
-
         const normalizedEmail =
-            email
-                .trim()
-                .toLowerCase();
-
-        // ========================================================
-        // FIND USER
-        // ========================================================
+            normalizeEmail(email);
 
         const user =
             await User.findOne({
@@ -1151,10 +1196,6 @@ exports.login = async (
                 "+emailVerificationAttempts " +
                 "+emailVerificationLastSentAt"
             );
-
-        // ========================================================
-        // USER NOT FOUND
-        // ========================================================
 
         if (!user) {
 
@@ -1169,9 +1210,9 @@ exports.login = async (
 
         }
 
-        // ========================================================
+        // ------------------------------------------------------
         // ACCOUNT STATUS
-        // ========================================================
+        // ------------------------------------------------------
 
         if (
             user.isActive === false
@@ -1188,9 +1229,9 @@ exports.login = async (
 
         }
 
-        // ========================================================
+        // ------------------------------------------------------
         // PASSWORD
-        // ========================================================
+        // ------------------------------------------------------
 
         const isMatch =
             await user.matchPassword(
@@ -1210,34 +1251,30 @@ exports.login = async (
 
         }
 
-        // ========================================================
+        // ------------------------------------------------------
         // EMAIL NOT VERIFIED
-        // ========================================================
+        // ------------------------------------------------------
 
-        if (!user.emailVerified) {
+        if (
+            !user.emailVerified
+        ) {
 
-            let otpWasSent = false;
+            let otpWasSent =
+                false;
 
             let otpMessage =
                 "Please verify your email before logging in.";
-
-            // ----------------------------------------------------
-            // CHECK WHETHER EXISTING OTP IS STILL VALID
-            // ----------------------------------------------------
 
             const existingOtpIsValid =
                 user.emailVerificationOtp &&
                 user.emailVerificationOtpExpires &&
                 new Date() <
-                    new Date(
-                        user.emailVerificationOtpExpires
-                    );
+                new Date(
+                    user.emailVerificationOtpExpires
+                );
 
-            // ----------------------------------------------------
-            // CHECK 60 SECOND COOLDOWN
-            // ----------------------------------------------------
-
-            let canSendOtp = true;
+            let canSendOtp =
+                true;
 
             if (
                 user.emailVerificationLastSentAt
@@ -1254,18 +1291,20 @@ exports.login = async (
                     );
 
                 if (
-                    secondsPassed < 60
+                    secondsPassed <
+                    OTP_COOLDOWN_SECONDS
                 ) {
 
-                    canSendOtp = false;
+                    canSendOtp =
+                        false;
 
                 }
 
             }
 
-            // ----------------------------------------------------
+            // --------------------------------------------------
             // SEND NEW OTP
-            // ----------------------------------------------------
+            // --------------------------------------------------
 
             if (
                 !existingOtpIsValid ||
@@ -1275,20 +1314,16 @@ exports.login = async (
                 const otp =
                     generateOtp();
 
-                const hashedOtp =
+                user.emailVerificationOtp =
                     hashOtp(otp);
 
-                const otpExpires =
+                user.emailVerificationOtpExpires =
                     new Date(
                         Date.now() +
-                        10 * 60 * 1000
+                        OTP_EXPIRY_MINUTES *
+                        60 *
+                        1000
                     );
-
-                user.emailVerificationOtp =
-                    hashedOtp;
-
-                user.emailVerificationOtpExpires =
-                    otpExpires;
 
                 user.emailVerificationAttempts =
                     0;
@@ -1306,7 +1341,8 @@ exports.login = async (
                         otp
                     );
 
-                    otpWasSent = true;
+                    otpWasSent =
+                        true;
 
                     otpMessage =
                         "Your email is not verified. A new verification OTP has been sent to your email.";
@@ -1315,8 +1351,21 @@ exports.login = async (
 
                     console.error(
                         "LOGIN VERIFICATION EMAIL ERROR:",
+                        emailError?.response?.data ||
+                        emailError?.message ||
                         emailError
                     );
+
+                    user.emailVerificationOtp =
+                        null;
+
+                    user.emailVerificationOtpExpires =
+                        null;
+
+                    user.emailVerificationLastSentAt =
+                        null;
+
+                    await user.save();
 
                     return res.status(500).json({
 
@@ -1336,9 +1385,9 @@ exports.login = async (
 
             }
 
-            // ----------------------------------------------------
-            // DO NOT CREATE LOGIN TOKEN
-            // ----------------------------------------------------
+            // --------------------------------------------------
+            // NO LOGIN TOKEN
+            // --------------------------------------------------
 
             return res.status(403).json({
 
@@ -1363,16 +1412,12 @@ exports.login = async (
 
         }
 
-        // ========================================================
+        // ------------------------------------------------------
         // VERIFIED USER
-        // ========================================================
+        // ------------------------------------------------------
 
         const token =
             generateToken(user);
-
-        // ========================================================
-        // RESPONSE
-        // ========================================================
 
         return res.status(200).json({
 
@@ -1476,12 +1521,10 @@ exports.forgotPassword = async (
                 "+passwordResetLastSentAt"
             );
 
-        /*
-         * Security:
-         *
-         * We don't reveal whether an email exists.
-         * This prevents account enumeration.
-         */
+        // ------------------------------------------------------
+        // SECURITY:
+        // Do not reveal whether email exists.
+        // ------------------------------------------------------
 
         if (!user) {
 
@@ -1497,7 +1540,7 @@ exports.forgotPassword = async (
         }
 
         // ------------------------------------------------------
-        // RESET OTP COOLDOWN
+        // COOLDOWN
         // ------------------------------------------------------
 
         if (
@@ -1515,7 +1558,8 @@ exports.forgotPassword = async (
                 );
 
             if (
-                secondsPassed < 60
+                secondsPassed <
+                OTP_COOLDOWN_SECONDS
             ) {
 
                 return res.status(429).json({
@@ -1523,7 +1567,7 @@ exports.forgotPassword = async (
                     success: false,
 
                     message:
-                        `Please wait ${60 - secondsPassed} seconds before requesting another password reset OTP.`
+                        `Please wait ${OTP_COOLDOWN_SECONDS - secondsPassed} seconds before requesting another password reset OTP.`
 
                 });
 
@@ -1532,7 +1576,7 @@ exports.forgotPassword = async (
         }
 
         // ------------------------------------------------------
-        // GENERATE OTP
+        // GENERATE RESET OTP
         // ------------------------------------------------------
 
         const otp =
@@ -1544,7 +1588,9 @@ exports.forgotPassword = async (
         user.passwordResetOtpExpires =
             new Date(
                 Date.now() +
-                10 * 60 * 1000
+                OTP_EXPIRY_MINUTES *
+                60 *
+                1000
             );
 
         user.passwordResetAttempts =
@@ -1556,7 +1602,7 @@ exports.forgotPassword = async (
         await user.save();
 
         // ------------------------------------------------------
-        // SEND EMAIL
+        // SEND RESET EMAIL
         // ------------------------------------------------------
 
         try {
@@ -1567,10 +1613,17 @@ exports.forgotPassword = async (
                 otp
             );
 
+            console.log(
+                "✅ Password reset email sent:",
+                user.email
+            );
+
         } catch (emailError) {
 
             console.error(
                 "Password reset email error:",
+                emailError?.response?.data ||
+                emailError?.message ||
                 emailError
             );
 
@@ -1578,6 +1631,9 @@ exports.forgotPassword = async (
                 null;
 
             user.passwordResetOtpExpires =
+                null;
+
+            user.passwordResetLastSentAt =
                 null;
 
             await user.save();
@@ -1734,7 +1790,8 @@ exports.verifyResetOtp = async (
         // ------------------------------------------------------
 
         if (
-            user.passwordResetAttempts >= 5
+            user.passwordResetAttempts >=
+            MAX_OTP_ATTEMPTS
         ) {
 
             return res.status(429).json({
@@ -1762,7 +1819,8 @@ exports.verifyResetOtp = async (
             user.passwordResetOtp
         ) {
 
-            user.passwordResetAttempts += 1;
+            user.passwordResetAttempts +=
+                1;
 
             await user.save();
 
@@ -1781,10 +1839,9 @@ exports.verifyResetOtp = async (
         }
 
         // ------------------------------------------------------
-        // OTP IS VALID
+        // DO NOT CONSUME OTP HERE
         //
-        // We don't consume it here because resetPassword()
-        // still needs it to securely change the password.
+        // resetPassword() verifies it again.
         // ------------------------------------------------------
 
         return res.status(200).json({
@@ -1944,7 +2001,8 @@ exports.resetPassword = async (
         // ------------------------------------------------------
 
         if (
-            user.passwordResetAttempts >= 5
+            user.passwordResetAttempts >=
+            MAX_OTP_ATTEMPTS
         ) {
 
             return res.status(429).json({
@@ -1961,7 +2019,7 @@ exports.resetPassword = async (
         // ------------------------------------------------------
         // VERIFY OTP AGAIN
         //
-        // Never trust that the frontend previously verified it.
+        // Never trust the frontend's previous verification.
         // ------------------------------------------------------
 
         const hashedOtp =
@@ -1974,7 +2032,8 @@ exports.resetPassword = async (
             user.passwordResetOtp
         ) {
 
-            user.passwordResetAttempts += 1;
+            user.passwordResetAttempts +=
+                1;
 
             await user.save();
 
@@ -1995,7 +2054,7 @@ exports.resetPassword = async (
         // ------------------------------------------------------
         // CHANGE PASSWORD
         //
-        // UserSchema pre-save middleware will hash it.
+        // User model pre-save middleware hashes it.
         // ------------------------------------------------------
 
         user.password =
