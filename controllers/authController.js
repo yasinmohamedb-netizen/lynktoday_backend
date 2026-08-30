@@ -5,7 +5,7 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
 // ============================================================
-// EMAIL TRANSPORTER
+// EMAIL TRANSPORTER - GMAIL OAUTH 2.0
 // ============================================================
 
 const transporter = nodemailer.createTransport({
@@ -14,11 +14,19 @@ const transporter = nodemailer.createTransport({
 
     auth: {
 
+        type: "OAuth2",
+
         user:
             process.env.EMAIL_USER,
 
-        pass:
-            process.env.EMAIL_APP_PASSWORD
+        clientId:
+            process.env.GOOGLE_CLIENT_ID,
+
+        clientSecret:
+            process.env.GOOGLE_CLIENT_SECRET,
+
+        refreshToken:
+            process.env.GOOGLE_REFRESH_TOKEN
 
     }
 
@@ -320,7 +328,6 @@ exports.signup = async (
     try {
 
         const {
-
             fullName,
             email,
             password,
@@ -329,7 +336,6 @@ exports.signup = async (
             location,
             tradeIntent,
             agreeToTerms
-
         } = req.body;
 
         // ------------------------------------------------------
@@ -472,6 +478,7 @@ exports.signup = async (
                 );
 
                 // Clear OTP because email wasn't sent.
+
                 user.emailVerificationOtp =
                     null;
 
@@ -1004,7 +1011,7 @@ exports.resendVerification = async (
 
         }
 
-        // ------------------------------------------------------
+            // ------------------------------------------------------
         // NEW OTP
         // ------------------------------------------------------
 
@@ -1090,7 +1097,6 @@ exports.resendVerification = async (
 // LOGIN
 // POST /api/v1/auth/login
 // ============================================================
-
 
 exports.login = async (
     req,
@@ -1250,8 +1256,11 @@ exports.login = async (
                 if (
                     secondsPassed < 60
                 ) {
+
                     canSendOtp = false;
+
                 }
+
             }
 
             // ----------------------------------------------------

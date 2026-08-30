@@ -9,27 +9,57 @@ const { Server } = require("socket.io");
 
 const connectDB = require("./config/db");
 
-// ==========================================
-// Routes
-// ==========================================
+// ============================================================
+// ROUTES
+// ============================================================
 
-const authRoutes = require("./routes/authRoutes");
-const postRoutes = require("./routes/postRoutes");
-const messageRoutes = require("./routes/messageRoutes");
-const connectionRoutes = require("./routes/connectionRoutes");
-const userRoutes = require("./routes/userRoutes");
-const sidebarContentRoutes = require("./routes/sidebarContentRoutes");
-const commentRoutes = require("./routes/commentRoutes");
-const notificationRoutes = require("./routes/notificationRoutes");
-const profileRoutes = require("./routes/profileRoutes");
-const followRoutes = require("./routes/followRoutes");
-const searchRoutes = require("./routes/searchRoutes");
+const authRoutes =
+    require("./routes/authRoutes");
 
-const questionRoutes = require("./routes/questionRoutes");
-const hsCodeRoutes = require("./routes/hsCodeRoutes");
-const documentationRoutes = require("./routes/documentationRoutes");
-const topicRoutes = require("./routes/topicRoutes");
-const rightSidebarRoutes = require("./routes/rightSidebarRoutes");
+const postRoutes =
+    require("./routes/postRoutes");
+
+const messageRoutes =
+    require("./routes/messageRoutes");
+
+const connectionRoutes =
+    require("./routes/connectionRoutes");
+
+const userRoutes =
+    require("./routes/userRoutes");
+
+const sidebarContentRoutes =
+    require("./routes/sidebarContentRoutes");
+
+const commentRoutes =
+    require("./routes/commentRoutes");
+
+const notificationRoutes =
+    require("./routes/notificationRoutes");
+
+const profileRoutes =
+    require("./routes/profileRoutes");
+
+const followRoutes =
+    require("./routes/followRoutes");
+
+const searchRoutes =
+    require("./routes/searchRoutes");
+
+const questionRoutes =
+    require("./routes/questionRoutes");
+
+const hsCodeRoutes =
+    require("./routes/hsCodeRoutes");
+
+const documentationRoutes =
+    require("./routes/documentationRoutes");
+
+const topicRoutes =
+    require("./routes/topicRoutes");
+
+const rightSidebarRoutes =
+    require("./routes/rightSidebarRoutes");
 
 const adminHighlightRoutes =
     require("./routes/adminHighlightRoutes");
@@ -37,9 +67,13 @@ const adminHighlightRoutes =
 const adminSidebarRoutes =
     require("./routes/adminSidebarRoutes");
 
-// ==========================================
-// Socket Manager
-// ==========================================
+// NEW: Email test route
+const emailRoutes =
+    require("./routes/emailRoutes");
+
+// ============================================================
+// SOCKET MANAGER
+// ============================================================
 
 const {
     addUserSocket,
@@ -47,25 +81,25 @@ const {
     getUserSocket
 } = require("./utils/socketManager");
 
-// ==========================================
-// Error Middleware
-// ==========================================
+// ============================================================
+// ERROR MIDDLEWARE
+// ============================================================
 
 const errorHandler =
     require("./middleware/errorMiddleware");
 
-// ==========================================
-// Express App
-// ==========================================
+// ============================================================
+// EXPRESS APP
+// ============================================================
 
 const app = express();
 
 const server =
     http.createServer(app);
 
-// ==========================================
+// ============================================================
 // FRONTEND URLS
-// ==========================================
+// ============================================================
 
 const allowedOrigins = [
 
@@ -80,9 +114,9 @@ const allowedOrigins = [
 
 ];
 
-// ==========================================
+// ============================================================
 // CORS OPTIONS
-// ==========================================
+// ============================================================
 
 const corsOptions = {
 
@@ -91,11 +125,9 @@ const corsOptions = {
         callback
     ) {
 
-        // Allow requests that do not contain
-        // an Origin header.
-        //
-        // This is useful for server-to-server
-        // requests, health checks, etc.
+        // ------------------------------------------------------
+        // Requests without Origin
+        // ------------------------------------------------------
 
         if (!origin) {
 
@@ -106,7 +138,9 @@ const corsOptions = {
 
         }
 
-        // Allow known frontend origins
+        // ------------------------------------------------------
+        // Known frontend origins
+        // ------------------------------------------------------
 
         if (
             allowedOrigins.includes(origin)
@@ -119,7 +153,9 @@ const corsOptions = {
 
         }
 
-        // Reject unknown origins
+        // ------------------------------------------------------
+        // Unknown origin
+        // ------------------------------------------------------
 
         return callback(
             new Error(
@@ -130,59 +166,55 @@ const corsOptions = {
     },
 
     methods: [
-
         "GET",
         "POST",
         "PUT",
         "PATCH",
         "DELETE",
         "OPTIONS"
-
     ],
 
     allowedHeaders: [
-
         "Content-Type",
         "Authorization"
-
     ],
 
     credentials: true
 
 };
 
-// ==========================================
+// ============================================================
 // SOCKET.IO
-// ==========================================
+// ============================================================
 
-const io = new Server(
-    server,
-    {
-        cors: corsOptions
-    }
-);
+const io =
+    new Server(
+        server,
+        {
+            cors: corsOptions
+        }
+    );
 
-// ==========================================
-// Make Socket.IO Available
-// To Controllers
-// ==========================================
+// ============================================================
+// MAKE SOCKET.IO AVAILABLE TO CONTROLLERS
+// ============================================================
 
 app.set(
     "io",
     io
 );
 
-// ==========================================
-// Security
-// ==========================================
+// ============================================================
+// SECURITY
+// ============================================================
 
 app.use(
     helmet()
 );
 
-// ==========================================
+// ============================================================
 // CORS
-// ==========================================
+// ============================================================
 
 app.use(
     cors(
@@ -190,9 +222,9 @@ app.use(
     )
 );
 
-// ==========================================
-// Rate Limiting
-// ==========================================
+// ============================================================
+// RATE LIMITING
+// ============================================================
 
 const limiter =
     rateLimit({
@@ -200,7 +232,8 @@ const limiter =
         windowMs:
             15 * 60 * 1000,
 
-        max: 500,
+        max:
+            500,
 
         message: {
 
@@ -218,9 +251,9 @@ app.use(
     limiter
 );
 
-// ==========================================
-// Body Parser
-// ==========================================
+// ============================================================
+// BODY PARSER
+// ============================================================
 
 app.use(
     express.json({
@@ -238,148 +271,195 @@ app.use(
     })
 );
 
-// ==========================================
-// Static Uploads
-// ==========================================
+// ============================================================
+// STATIC UPLOADS
+// ============================================================
 
 app.use(
     "/uploads",
     express.static("uploads")
 );
 
-// ==========================================
+// ============================================================
 // API ROUTES
-// ==========================================
+// ============================================================
 
-// HS Codes
+// ------------------------------------------------------------
+// HS CODES
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/hs-codes",
     hsCodeRoutes
 );
 
-// Profile
+// ------------------------------------------------------------
+// PROFILE
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/profile",
     profileRoutes
 );
 
-// Questions
+// ------------------------------------------------------------
+// QUESTIONS
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/questions",
     questionRoutes
 );
 
-// Search
+// ------------------------------------------------------------
+// SEARCH
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/search",
     searchRoutes
 );
 
-// Documentation
+// ------------------------------------------------------------
+// DOCUMENTATION
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/documentation",
     documentationRoutes
 );
 
-// Topics
+// ------------------------------------------------------------
+// TOPICS
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/topics",
     topicRoutes
 );
 
-// Follow
+// ------------------------------------------------------------
+// FOLLOW
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/follow",
     followRoutes
 );
 
-// Authentication
+// ------------------------------------------------------------
+// AUTHENTICATION
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/auth",
     authRoutes
 );
 
-// Posts
+// ------------------------------------------------------------
+// EMAIL
+// ------------------------------------------------------------
+
+// POST /api/v1/email/test-email
+
+app.use(
+    "/api/v1/email",
+    emailRoutes
+);
+
+// ------------------------------------------------------------
+// POSTS
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/posts",
     postRoutes
 );
 
-// Messages
+// ------------------------------------------------------------
+// MESSAGES
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/messages",
     messageRoutes
 );
 
-// Connections
+// ------------------------------------------------------------
+// CONNECTIONS
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/connections",
     connectionRoutes
 );
 
-// Users
+// ------------------------------------------------------------
+// USERS
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/users",
     userRoutes
 );
 
-// Sidebar Content
+// ------------------------------------------------------------
+// SIDEBAR CONTENT
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1",
     sidebarContentRoutes
 );
 
-// Comments
+// ------------------------------------------------------------
+// COMMENTS
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/comments",
     commentRoutes
 );
 
-// Notifications
+// ------------------------------------------------------------
+// NOTIFICATIONS
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/notifications",
     notificationRoutes
 );
 
-// Right Sidebar
+// ------------------------------------------------------------
+// RIGHT SIDEBAR
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/right-sidebar",
     rightSidebarRoutes
 );
 
-// Admin Highlights
+// ------------------------------------------------------------
+// ADMIN HIGHLIGHTS
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/admin/highlights",
     adminHighlightRoutes
 );
 
-// Admin Sidebar
+// ------------------------------------------------------------
+// ADMIN SIDEBAR
+// ------------------------------------------------------------
 
 app.use(
     "/api/v1/admin/sidebar",
     adminSidebarRoutes
 );
 
-// ==========================================
+// ============================================================
 // HEALTH CHECK
-// ==========================================
+// ============================================================
 
 app.get(
     "/",
@@ -397,9 +477,9 @@ app.get(
     }
 );
 
-// ==========================================
+// ============================================================
 // SOCKET.IO
-// ==========================================
+// ============================================================
 
 io.on(
     "connection",
@@ -410,9 +490,9 @@ io.on(
             socket.id
         );
 
-        // ==================================
+        // ====================================================
         // SETUP USER
-        // ==================================
+        // ====================================================
 
         socket.on(
             "setup",
@@ -456,22 +536,23 @@ io.on(
 
                 console.log(
                     "SOCKET ROOMS:",
-                    Array.from(socket.rooms)
+                    Array.from(
+                        socket.rooms
+                    )
                 );
 
             }
         );
 
-        // ==================================
+        // ====================================================
         // JOIN CHAT ROOM
-        // ==================================
+        // ====================================================
 
         socket.on(
             "join_room",
             (roomId) => {
 
                 if (!roomId) {
-
                     return;
                 }
 
@@ -486,16 +567,15 @@ io.on(
             }
         );
 
-        // ==================================
+        // ====================================================
         // LEAVE CHAT ROOM
-        // ==================================
+        // ====================================================
 
         socket.on(
             "leave_room",
             (roomId) => {
 
                 if (!roomId) {
-
                     return;
                 }
 
@@ -510,21 +590,19 @@ io.on(
             }
         );
 
-        // ==================================
+        // ====================================================
         // CONNECTION REQUEST
-        // ==================================
+        // ====================================================
 
         socket.on(
             "send_request",
             (data) => {
 
                 if (!data) {
-
                     return;
                 }
 
                 if (!data.receiverId) {
-
                     return;
                 }
 
@@ -547,16 +625,15 @@ io.on(
             }
         );
 
-        // ==================================
+        // ====================================================
         // REAL-TIME MESSAGE
-        // ==================================
+        // ====================================================
 
         socket.on(
             "send_message",
             (messageData) => {
 
                 if (!messageData) {
-
                     return;
                 }
 
@@ -566,7 +643,6 @@ io.on(
                     messageData.conversationId;
 
                 if (!roomId) {
-
                     return;
                 }
 
@@ -580,16 +656,15 @@ io.on(
             }
         );
 
-        // ==================================
+        // ====================================================
         // MESSAGE TYPING
-        // ==================================
+        // ====================================================
 
         socket.on(
             "typing",
             (data) => {
 
                 if (!data) {
-
                     return;
                 }
 
@@ -599,7 +674,6 @@ io.on(
                     data.conversationId;
 
                 if (!roomId) {
-
                     return;
                 }
 
@@ -613,16 +687,15 @@ io.on(
             }
         );
 
-        // ==================================
+        // ====================================================
         // STOP TYPING
-        // ==================================
+        // ====================================================
 
         socket.on(
             "stop_typing",
             (data) => {
 
                 if (!data) {
-
                     return;
                 }
 
@@ -632,7 +705,6 @@ io.on(
                     data.conversationId;
 
                 if (!roomId) {
-
                     return;
                 }
 
@@ -646,16 +718,15 @@ io.on(
             }
         );
 
-        // ==================================
+        // ====================================================
         // MESSAGE READ
-        // ==================================
+        // ====================================================
 
         socket.on(
             "message_read",
             (data) => {
 
                 if (!data) {
-
                     return;
                 }
 
@@ -665,7 +736,6 @@ io.on(
                     data.conversationId;
 
                 if (!roomId) {
-
                     return;
                 }
 
@@ -679,16 +749,15 @@ io.on(
             }
         );
 
-        // ==================================
+        // ====================================================
         // USER ONLINE
-        // ==================================
+        // ====================================================
 
         socket.on(
             "user_online",
             (data) => {
 
                 if (!data) {
-
                     return;
                 }
 
@@ -698,7 +767,6 @@ io.on(
                     data.conversationId;
 
                 if (!roomId) {
-
                     return;
                 }
 
@@ -712,16 +780,15 @@ io.on(
             }
         );
 
-        // ==================================
+        // ====================================================
         // USER OFFLINE
-        // ==================================
+        // ====================================================
 
         socket.on(
             "user_offline",
             (data) => {
 
                 if (!data) {
-
                     return;
                 }
 
@@ -731,7 +798,6 @@ io.on(
                     data.conversationId;
 
                 if (!roomId) {
-
                     return;
                 }
 
@@ -745,9 +811,9 @@ io.on(
             }
         );
 
-        // ==================================
+        // ====================================================
         // DISCONNECT
-        // ==================================
+        // ====================================================
 
         socket.on(
             "disconnect",
@@ -768,19 +834,18 @@ io.on(
     }
 );
 
-// ==========================================
+// ============================================================
 // ERROR HANDLER
-// IMPORTANT:
 // MUST BE AFTER ALL ROUTES
-// ==========================================
+// ============================================================
 
 app.use(
     errorHandler
 );
 
-// ==========================================
+// ============================================================
 // START SERVER
-// ==========================================
+// ============================================================
 
 const PORT =
     process.env.PORT || 5001;
