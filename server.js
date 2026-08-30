@@ -94,6 +94,16 @@ const errorHandler =
 
 const app = express();
 
+// ============================================================
+// RENDER / REVERSE PROXY
+// ============================================================
+
+// Render runs the application behind a reverse proxy.
+// Trust the first proxy so Express can correctly
+// identify the real client IP from X-Forwarded-For.
+// This is required by express-rate-limit.
+app.set("trust proxy", 1);
+
 const server =
     http.createServer(app);
 
