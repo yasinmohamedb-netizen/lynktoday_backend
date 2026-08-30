@@ -1,53 +1,158 @@
 const express = require("express");
+
 const router = express.Router();
 
-// ================================
-// Models
-// ================================
+// ============================================================
+// MODELS
+// ============================================================
+
 const User = require("../models/User");
 
-// ================================
-// Controllers
-// ================================
+// ============================================================
+// CONTROLLERS
+// ============================================================
+
 const {
     signup,
     login,
     verifyEmail,
-    resendVerification
+    resendVerification,
+
+    // Password reset
+    forgotPassword,
+    verifyResetOtp,
+    resetPassword
 } = require("../controllers/authController");
 
-// ================================
-// Middleware
-// ================================
+// ============================================================
+// MIDDLEWARE
+// ============================================================
+
 const {
     protect
 } = require("../middleware/authMiddleware");
 
-// ============================================
-// Public Routes
-// ============================================
+// ============================================================
+// PUBLIC AUTH ROUTES
+// ============================================================
 
-// Register
-router.post("/signup", signup);
+// ------------------------------------------------------------
+// SIGNUP
+// POST /api/v1/auth/signup
+// ------------------------------------------------------------
 
-// Verify Email OTP
-router.post("/verify-email", verifyEmail);
+router.post(
+    "/signup",
+    signup
+);
 
-// Resend Verification OTP
+// ------------------------------------------------------------
+// VERIFY EMAIL OTP
+// POST /api/v1/auth/verify-email
+// ------------------------------------------------------------
+
+router.post(
+    "/verify-email",
+    verifyEmail
+);
+
+// ------------------------------------------------------------
+// RESEND VERIFICATION OTP
+// POST /api/v1/auth/resend-verification
+//
+// IMPORTANT:
+// Frontend must use this exact endpoint.
+// ------------------------------------------------------------
+
 router.post(
     "/resend-verification",
     resendVerification
 );
 
-// Login
-router.post("/login", login);
+// Backward-compatible alias.
+// This prevents older frontend code using /resend-otp
+// from immediately breaking.
 
+router.post(
+    "/resend-otp",
+    resendVerification
+);
 
-// ============================================
-// Protected Routes
-// ============================================
+// ------------------------------------------------------------
+// LOGIN
+// POST /api/v1/auth/login
+// ------------------------------------------------------------
 
-// Get Logged-in User
+router.post(
+    "/login",
+    login
+);
+
+// ============================================================
+// PASSWORD RESET ROUTES
+// ============================================================
+
+// ------------------------------------------------------------
+// FORGOT PASSWORD
+//
+// POST /api/v1/auth/forgot-password
+//
+// Body:
+// {
+//     "email": "user@example.com"
+// }
+// ------------------------------------------------------------
+
+router.post(
+    "/forgot-password",
+    forgotPassword
+);
+
+// ------------------------------------------------------------
+// VERIFY PASSWORD RESET OTP
+//
+// POST /api/v1/auth/verify-reset-otp
+//
+// Body:
+// {
+//     "email": "user@example.com",
+//     "otp": "123456"
+// }
+// ------------------------------------------------------------
+
+router.post(
+    "/verify-reset-otp",
+    verifyResetOtp
+);
+
+// ------------------------------------------------------------
+// RESET PASSWORD
+//
+// POST /api/v1/auth/reset-password
+//
+// Body:
+// {
+//     "email": "user@example.com",
+//     "otp": "123456",
+//     "newPassword": "NewPassword123"
+// }
+// ------------------------------------------------------------
+
+router.post(
+    "/reset-password",
+    resetPassword
+);
+
+// ============================================================
+// PROTECTED ROUTES
+// ============================================================
+
+// ------------------------------------------------------------
+// GET LOGGED-IN USER
+//
+// GET /api/v1/auth/me
+// ------------------------------------------------------------
+
 router.get(
     "/me",
     protect,
@@ -90,5 +195,8 @@ router.get(
     }
 );
 
+// ============================================================
+// EXPORT
+// ============================================================
 
 module.exports = router;

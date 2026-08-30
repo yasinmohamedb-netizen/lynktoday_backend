@@ -52,6 +52,11 @@ const UserSchema = new mongoose.Schema(
             default: "individual"
         },
 
+
+        // ==================================================
+        // PROFESSION
+        // ==================================================
+
         profession: {
             type: String,
             enum: [
@@ -66,6 +71,13 @@ const UserSchema = new mongoose.Schema(
                 "Transporter",
                 "Trade Consultant",
                 "Student",
+                "Operations Executive",
+                "Sales Executive",
+                "Documentation Executive",
+                "Logistics Executive",
+                "Supply Chain Executive",
+                "Manager",
+                "Business Owner",
                 "Other"
             ],
             default: "Other"
@@ -339,7 +351,8 @@ const UserSchema = new mongoose.Schema(
             enum: [
                 "Import",
                 "Export",
-                "Both"
+                "Both",
+                "Import & Export"
             ],
             default: "Both"
         },
@@ -361,7 +374,7 @@ const UserSchema = new mongoose.Schema(
         // ==================================================
 
         /*
-         * This is separate from email verification.
+         * Separate from email verification.
          *
          * isVerified / verificationStatus are for
          * LynkToday's professional/account verification.
@@ -394,17 +407,56 @@ const UserSchema = new mongoose.Schema(
         // ==================================================
 
         /*
-         * Email verification is separate from the
-         * professional verification system above.
+         * Email verification is separate from
+         * professional verification.
          *
          * Signup is completed only after the user
-         * successfully verifies this OTP.
+         * successfully verifies the OTP.
          */
 
         emailVerified: {
             type: Boolean,
             default: false
         },
+
+
+        // ==================================================
+        // PASSWORD RESET
+        // ==================================================
+
+        /*
+         * Password reset OTP is stored hashed.
+         * Never store the plain OTP.
+         */
+
+        passwordResetOtp: {
+            type: String,
+            default: null,
+            select: false
+        },
+
+        passwordResetOtpExpires: {
+            type: Date,
+            default: null,
+            select: false
+        },
+
+        passwordResetAttempts: {
+            type: Number,
+            default: 0,
+            select: false
+        },
+
+        passwordResetLastSentAt: {
+            type: Date,
+            default: null,
+            select: false
+        },
+
+
+        // ==================================================
+        // EMAIL VERIFICATION OTP
+        // ==================================================
 
         /*
          * Store the HASHED OTP, not the plain OTP.
@@ -419,34 +471,17 @@ const UserSchema = new mongoose.Schema(
             select: false
         },
 
-        /*
-         * OTP will expire after a defined period.
-         * We will set the actual expiry time when
-         * generating the OTP.
-         */
-
         emailVerificationOtpExpires: {
             type: Date,
             default: null,
             select: false
         },
 
-        /*
-         * Number of incorrect OTP attempts.
-         *
-         * We will use this in the verification controller
-         * to prevent unlimited guessing attempts.
-         */
-
         emailVerificationAttempts: {
             type: Number,
             default: 0,
             select: false
         },
-
-        /*
-         * Used to implement resend cooldown.
-         */
 
         emailVerificationLastSentAt: {
             type: Date,
@@ -494,6 +529,7 @@ const UserSchema = new mongoose.Schema(
         }
 
     },
+
     {
         timestamps: true
     }
@@ -540,9 +576,7 @@ UserSchema.pre("save", async function () {
 
     // Password has not changed
     if (!this.isModified("password")) {
-
         return;
-
     }
 
     const salt =
@@ -582,20 +616,25 @@ UserSchema.methods.toSafeObject =
         const user =
             this.toObject();
 
+        // Password
         delete user.password;
 
+        // Professional verification
         delete user.verificationDocuments;
 
+        // Email verification
         delete user.emailVerificationOtp;
-
         delete user.emailVerificationOtpExpires;
-
         delete user.emailVerificationAttempts;
-
         delete user.emailVerificationLastSentAt;
 
-        return user;
+        // Password reset
+        delete user.passwordResetOtp;
+        delete user.passwordResetOtpExpires;
+        delete user.passwordResetAttempts;
+        delete user.passwordResetLastSentAt;
 
+        return user;
     };
 
 
