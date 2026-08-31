@@ -328,11 +328,7 @@ If you did not request a password reset, you can safely ignore this email.
 // POST /api/v1/auth/signup
 // ============================================================
 
-exports.signup = async (
-    req,
-    res,
-    next
-) => {
+exports.signup = async (req, res, next) => {
 
     try {
 
@@ -368,38 +364,38 @@ exports.signup = async (
 
         }
 
-        if (
-            password.length < 6
-        ) {
+        if (password.length < 8) {
 
             return res.status(400).json({
 
                 success: false,
 
                 message:
-                    "Password must be at least 6 characters."
+                    "Password must be at least 8 characters long."
 
             });
 
         }
 
-        if (
-            agreeToTerms === false
-        ) {
+        if (agreeToTerms === false) {
 
             return res.status(400).json({
 
                 success: false,
 
                 message:
-                    "You must agree to the terms and conditions."
+                    "You must agree to the Terms and Conditions."
 
             });
 
         }
+
+        // ------------------------------------------------------
+        // NORMALIZE EMAIL
+        // ------------------------------------------------------
 
         const normalizedEmail =
-            normalizeEmail(email);
+            email.trim().toLowerCase();
 
         // ------------------------------------------------------
         // CHECK EXISTING USER
@@ -408,61 +404,13 @@ exports.signup = async (
         let user =
             await User.findOne({
                 email: normalizedEmail
-            }).select(
-                "+emailVerificationOtp " +
-                "+emailVerificationOtpExpires " +
-                "+emailVerificationAttempts " +
-                "+emailVerificationLastSentAt"
-            );
+            });
 
         // ------------------------------------------------------
         // EXISTING UNVERIFIED USER
         // ------------------------------------------------------
 
-        if (
-            user &&
-            !user.emailVerified
-        ) {
-
-            let secondsPassed = 999;
-
-            if (
-                user.emailVerificationLastSentAt
-            ) {
-
-                secondsPassed =
-                    Math.floor(
-                        (
-                            Date.now() -
-                            new Date(
-                                user.emailVerificationLastSentAt
-                            ).getTime()
-                        ) / 1000
-                    );
-
-            }
-
-            if (
-                secondsPassed <
-                OTP_COOLDOWN_SECONDS
-            ) {
-
-                return res.status(429).json({
-
-                    success: false,
-
-                    code:
-                        "EMAIL_NOT_VERIFIED",
-
-                    message:
-                        `An account already exists but is not verified. Please wait ${OTP_COOLDOWN_SECONDS - secondsPassed} seconds before requesting another OTP.`,
-
-                    email:
-                        user.email
-
-                });
-
-            }
+        if (user && !user.emailVerified) {
 
             const otp =
                 generateOtp();
@@ -487,47 +435,36 @@ exports.signup = async (
             await user.save();
 
             // --------------------------------------------------
-            // SEND EMAIL
+            // SEND OTP IN BACKGROUND
             // --------------------------------------------------
 
-            try {
+            sendVerificationEmail(
+                user.email,
+                user.fullName,
+                otp
+            )
+                .then(() => {
 
-                await sendVerificationEmail(
-                    user.email,
-                    user.fullName,
-                    otp
-                );
+                    console.log(
+                        "✅ Verification OTP sent:",
+                        user.email
+                    );
 
-            } catch (emailError) {
+                })
+                .catch((emailError) => {
 
-                console.error(
-                    "Existing user verification email error:",
-                    emailError?.response?.data ||
-                    emailError?.message ||
-                    emailError
-                );
-
-                user.emailVerificationOtp =
-                    null;
-
-                user.emailVerificationOtpExpires =
-                    null;
-
-                user.emailVerificationLastSentAt =
-                    null;
-
-                await user.save();
-
-                return res.status(500).json({
-
-                    success: false,
-
-                    message:
-                        "Your account exists, but we could not send the verification email. Please try again."
+                    console.error(
+                        "❌ Background verification email failed:",
+                        emailError?.response?.data ||
+                        emailError?.message ||
+                        emailError
+                    );
 
                 });
 
-            }
+            // --------------------------------------------------
+            // RESPOND IMMEDIATELY
+            // --------------------------------------------------
 
             return res.status(200).json({
 
@@ -638,61 +575,40 @@ exports.signup = async (
         await user.save();
 
         // ------------------------------------------------------
-        // SEND VERIFICATION EMAIL
+        // SEND VERIFICATION EMAIL IN BACKGROUND
+        // ------------------------------------------------------
+        // IMPORTANT:
+        // Do NOT use await here.
+        // The API responds immediately.
+        // Gmail sends the OTP in the background.
         // ------------------------------------------------------
 
-        try {
+        sendVerificationEmail(
+            user.email,
+            user.fullName,
+            otp
+        )
+            .then(() => {
 
-            await sendVerificationEmail(
-                user.email,
-                user.fullName,
-                otp
-            );
-
-            console.log(
-                "✅ Signup verification email sent:",
-                user.email
-            );
-
-        } catch (emailError) {
-
-            console.error(
-                "Signup verification email error:",
-                emailError?.response?.data ||
-                emailError?.message ||
-                emailError
-            );
-
-            user.emailVerificationOtp =
-                null;
-
-            user.emailVerificationOtpExpires =
-                null;
-
-            user.emailVerificationLastSentAt =
-                null;
-
-            await user.save();
-
-            return res.status(503).json({
-
-                success: false,
-
-                code:
-                    "EMAIL_SEND_FAILED",
-
-                message:
-                    "Your account was created, but we could not send the verification email. Please try again.",
-
-                email:
+                console.log(
+                    "✅ Signup verification email sent:",
                     user.email
+                );
+
+            })
+            .catch((emailError) => {
+
+                console.error(
+                    "❌ Signup verification email error:",
+                    emailError?.response?.data ||
+                    emailError?.message ||
+                    emailError
+                );
 
             });
 
-        }
-
         // ------------------------------------------------------
-        // RESPONSE
+        // RESPOND IMMEDIATELY
         // ------------------------------------------------------
 
         return res.status(201).json({
