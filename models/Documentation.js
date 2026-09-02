@@ -13,6 +13,15 @@ const DocumentationSchema = new mongoose.Schema(
             maxlength: 250
         },
 
+        slug: {
+            type: String,
+            required: [true, "Documentation slug is required."],
+            unique: true,
+            lowercase: true,
+            trim: true,
+            maxlength: 300
+        },
+
         description: {
             type: String,
             required: [true, "Documentation description is required."],
@@ -206,6 +215,14 @@ DocumentationSchema.index({
 // HS Code
 DocumentationSchema.index({
     hsCode: 1
+});
+
+// Created by + Latest
+// Used by:
+// GET /api/v1/documentation/my
+DocumentationSchema.index({
+    createdBy: 1,
+    createdAt: -1
 });
 
 // Full text search
