@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const HSCodeSchema = new mongoose.Schema(
     {
         // ==========================================
-        // HS Code
+        // HS CODE
         // ==========================================
 
         hsCode: {
@@ -13,7 +13,7 @@ const HSCodeSchema = new mongoose.Schema(
         },
 
         // ==========================================
-        // Description
+        // DESCRIPTION
         // ==========================================
 
         description: {
@@ -23,12 +23,13 @@ const HSCodeSchema = new mongoose.Schema(
         },
 
         // ==========================================
-        // Classification
+        // CLASSIFICATION
         // ==========================================
 
         section: {
             type: String,
-            default: ""
+            default: "",
+            trim: true
         },
 
         sectionNumber: {
@@ -38,7 +39,8 @@ const HSCodeSchema = new mongoose.Schema(
 
         chapter: {
             type: String,
-            default: ""
+            default: "",
+            trim: true
         },
 
         chapterNumber: {
@@ -48,75 +50,89 @@ const HSCodeSchema = new mongoose.Schema(
 
         heading: {
             type: String,
-            default: ""
+            default: "",
+            trim: true
         },
 
         subHeading: {
             type: String,
-            default: ""
+            default: "",
+            trim: true
         },
 
         // ==========================================
-        // Tariff Information
+        // TARIFF INFORMATION
         // ==========================================
 
         unit: {
             type: String,
-            default: ""
+            default: "",
+            trim: true
         },
 
         basicDuty: {
             type: String,
-            default: ""
+            default: "",
+            trim: true
         },
 
         igst: {
             type: String,
-            default: ""
+            default: "",
+            trim: true
         },
 
         cess: {
             type: String,
-            default: ""
+            default: "",
+            trim: true
         },
 
         // ==========================================
-        // Trade Information
+        // TRADE INFORMATION
         // ==========================================
 
         importPolicy: {
             type: String,
-            default: ""
+            default: "",
+            trim: true
         },
 
         exportPolicy: {
             type: String,
-            default: ""
+            default: "",
+            trim: true
         },
 
         country: {
             type: String,
-            default: "India"
+            default: "India",
+            trim: true
         },
 
         // ==========================================
-        // Additional Information
+        // ADDITIONAL INFORMATION
         // ==========================================
 
         notes: {
             type: String,
-            default: ""
+            default: "",
+            trim: true
         },
 
         keywords: [
             {
                 type: String,
-                trim: true
+                trim: true,
+                lowercase: true
             }
         ],
 
         // ==========================================
-        // Status
+        // ACTIVE STATUS
+        //
+        // true  = publicly visible
+        // false = hidden
         // ==========================================
 
         isActive: {
@@ -125,7 +141,7 @@ const HSCodeSchema = new mongoose.Schema(
         },
 
         // ==========================================
-        // Audit
+        // OWNERSHIP / AUDIT
         // ==========================================
 
         createdBy: {
@@ -149,7 +165,7 @@ const HSCodeSchema = new mongoose.Schema(
 // INDEXES
 // ======================================================
 
-// Exact HS Code lookup
+// HS Code lookup
 HSCodeSchema.index({
     hsCode: 1
 });
@@ -159,13 +175,19 @@ HSCodeSchema.index({
     chapterNumber: 1
 });
 
-// Country + Active HS Codes
+// Country + active
 HSCodeSchema.index({
     country: 1,
     isActive: 1
 });
 
-// Full Text Search
+// User's contributions
+HSCodeSchema.index({
+    createdBy: 1,
+    createdAt: -1
+});
+
+// Full text search
 HSCodeSchema.index({
     description: "text",
     keywords: "text",

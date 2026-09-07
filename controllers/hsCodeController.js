@@ -2,16 +2,49 @@ const mongoose = require("mongoose");
 const HSCode = require("../models/HSCode");
 
 // ======================================================
-// Helper: Validate MongoDB ObjectId
+// HELPERS
 // ======================================================
+
+// ------------------------------------------------------
+// Validate MongoDB ObjectId
+// ------------------------------------------------------
 
 const isValidObjectId = (id) => {
     return mongoose.Types.ObjectId.isValid(id);
 };
 
-// ======================================================
-// Helper: Normalize keywords
-// ======================================================
+// ------------------------------------------------------
+// Get authenticated user's ID
+// ------------------------------------------------------
+
+const getUserId = (req) => {
+    return req.user?.userId || req.user?._id || null;
+};
+
+// ------------------------------------------------------
+// Check if user is admin
+// ------------------------------------------------------
+
+const isAdmin = (req) => {
+    return (
+        req.user?.role === "admin" ||
+        req.user?.isAdmin === true
+    );
+};
+
+// ------------------------------------------------------
+// Normalize HS Code
+// ------------------------------------------------------
+
+const normalizeHSCode = (value) => {
+    return String(value || "")
+        .trim()
+        .replace(/\s+/g, "");
+};
+
+// ------------------------------------------------------
+// Normalize keywords
+// ------------------------------------------------------
 
 const normalizeKeywords = (keywords) => {
     if (!Array.isArray(keywords)) {
@@ -21,33 +54,73 @@ const normalizeKeywords = (keywords) => {
     return [
         ...new Set(
             keywords
-                .map((keyword) => String(keyword).trim().toLowerCase())
+                .map((keyword) =>
+                    String(keyword)
+                        .trim()
+                        .toLowerCase()
+                )
                 .filter(Boolean)
         )
     ];
 };
 
+// ------------------------------------------------------
+// Parse optional number
+// ------------------------------------------------------
+
+const parseOptionalNumber = (value) => {
+    if (
+        value === undefined ||
+        value === null ||
+        value === ""
+    ) {
+        return null;
+    }
+
+    const number = Number(value);
+
+    if (Number.isNaN(number)) {
+        return null;
+    }
+
+    return number;
+};
+
+// ------------------------------------------------------
+// Check ownership
+//
+// Owner = createdBy === logged-in user
+// Admin = always allowed
+// ------------------------------------------------------
+
+const canModifyHSCode = (req, hsCode) => {
+    if (isAdmin(req)) {
+        return true;
+    }
+
+    const userId = getUserId(req);
+
+    if (!userId || !hsCode?.createdBy) {
+        return false;
+    }
+
+    return (
+        String(hsCode.createdBy) ===
+        String(userId)
+    );
+};
+
 // ======================================================
-// GET ALL / SEARCH HS CODES
+// GET ALL HS CODES
 //
 // GET /api/v1/hs-codes
-//
-// Supports:
-// ?page=1
-// ?limit=20
-// ?search=cotton
-// ?hsCode=62034200
-// ?description=trousers
-// ?keyword=cotton
-// ?chapterNumber=62
-// ?chapter=Articles of apparel
-// ?heading=6203
-// ?country=India
-// ?isActive=true
-// ?sort=newest
 // ======================================================
 
-exports.getHSCodes = async (req, res, next) => {
+exports.getHSCodes = async (
+    req,
+    res,
+    next
+) => {
     try {
         // ==========================================
         // Pagination
@@ -78,7 +151,8 @@ exports.getHSCodes = async (req, res, next) => {
         // Search
         // ==========================================
 
-        const search = req.query.search?.trim();
+        const search =
+            req.query.search?.trim();
 
         if (search) {
             query.$or = [
@@ -122,34 +196,40 @@ exports.getHSCodes = async (req, res, next) => {
         }
 
         // ==========================================
-        // Exact / Partial HS Code
+        // HS Code filter
         // ==========================================
 
         if (req.query.hsCode) {
             query.hsCode = {
-                $regex: String(req.query.hsCode).trim(),
+                $regex: String(
+                    req.query.hsCode
+                ).trim(),
                 $options: "i"
             };
         }
 
         // ==========================================
-        // Description
+        // Description filter
         // ==========================================
 
         if (req.query.description) {
             query.description = {
-                $regex: String(req.query.description).trim(),
+                $regex: String(
+                    req.query.description
+                ).trim(),
                 $options: "i"
             };
         }
 
         // ==========================================
-        // Keyword
+        // Keyword filter
         // ==========================================
 
         if (req.query.keyword) {
             query.keywords = {
-                $regex: String(req.query.keyword).trim(),
+                $regex: String(
+                    req.query.keyword
+                ).trim(),
                 $options: "i"
             };
         }
@@ -159,25 +239,32 @@ exports.getHSCodes = async (req, res, next) => {
         // ==========================================
 
         if (
-            req.query.chapterNumber !== undefined &&
+            req.query.chapterNumber !==
+                undefined &&
             req.query.chapterNumber !== ""
         ) {
-            const chapterNumber = Number(
-                req.query.chapterNumber
-            );
+            const chapterNumber =
+                Number(
+                    req.query.chapterNumber
+                );
 
-            if (!Number.isNaN(chapterNumber)) {
-                query.chapterNumber = chapterNumber;
+            if (
+                !Number.isNaN(chapterNumber)
+            ) {
+                query.chapterNumber =
+                    chapterNumber;
             }
         }
 
         // ==========================================
-        // Chapter Name
+        // Chapter
         // ==========================================
 
         if (req.query.chapter) {
             query.chapter = {
-                $regex: String(req.query.chapter).trim(),
+                $regex: String(
+                    req.query.chapter
+                ).trim(),
                 $options: "i"
             };
         }
@@ -188,7 +275,9 @@ exports.getHSCodes = async (req, res, next) => {
 
         if (req.query.heading) {
             query.heading = {
-                $regex: String(req.query.heading).trim(),
+                $regex: String(
+                    req.query.heading
+                ).trim(),
                 $options: "i"
             };
         }
@@ -208,30 +297,33 @@ exports.getHSCodes = async (req, res, next) => {
 
         // ==========================================
         // Active / Inactive
+        //
+        // Public users should only see active
+        // records.
+        //
+        // Admin can request inactive records.
         // ==========================================
 
-        if (req.query.isActive !== undefined) {
-            const value = String(
-                req.query.isActive
-            ).toLowerCase();
+        if (isAdmin(req)) {
+            if (
+                req.query.isActive !==
+                undefined
+            ) {
+                const value = String(
+                    req.query.isActive
+                ).toLowerCase();
 
-            if (value === "true") {
+                if (value === "true") {
+                    query.isActive = true;
+                }
+
+                if (value === "false") {
+                    query.isActive = false;
+                }
+            } else {
                 query.isActive = true;
             }
-
-            if (value === "false") {
-                query.isActive = false;
-            }
-        }
-
-        // ==========================================
-        // Default
-        // Only active records for public listing
-        // ==========================================
-
-        if (
-            req.query.isActive === undefined
-        ) {
+        } else {
             query.isActive = true;
         }
 
@@ -243,25 +335,37 @@ exports.getHSCodes = async (req, res, next) => {
             hsCode: 1
         };
 
-        if (req.query.sort === "newest") {
+        if (
+            req.query.sort ===
+            "newest"
+        ) {
             sort = {
                 createdAt: -1
             };
         }
 
-        if (req.query.sort === "oldest") {
+        if (
+            req.query.sort ===
+            "oldest"
+        ) {
             sort = {
                 createdAt: 1
             };
         }
 
-        if (req.query.sort === "hsCode") {
+        if (
+            req.query.sort ===
+            "hsCode"
+        ) {
             sort = {
                 hsCode: 1
             };
         }
 
-        if (req.query.sort === "chapter") {
+        if (
+            req.query.sort ===
+            "chapter"
+        ) {
             sort = {
                 chapterNumber: 1,
                 hsCode: 1
@@ -269,26 +373,28 @@ exports.getHSCodes = async (req, res, next) => {
         }
 
         // ==========================================
-        // Query Database
+        // Database
         // ==========================================
 
-        const [hsCodes, total] =
-            await Promise.all([
-                HSCode.find(query)
-                    .populate(
-                        "createdBy",
-                        "fullName email"
-                    )
-                    .populate(
-                        "updatedBy",
-                        "fullName email"
-                    )
-                    .sort(sort)
-                    .skip(skip)
-                    .limit(limit),
+        const [
+            hsCodes,
+            total
+        ] = await Promise.all([
+            HSCode.find(query)
+                .populate(
+                    "createdBy",
+                    "fullName email"
+                )
+                .populate(
+                    "updatedBy",
+                    "fullName email"
+                )
+                .sort(sort)
+                .skip(skip)
+                .limit(limit),
 
-                HSCode.countDocuments(query)
-            ]);
+            HSCode.countDocuments(query)
+        ]);
 
         // ==========================================
         // Response
@@ -303,15 +409,21 @@ exports.getHSCodes = async (req, res, next) => {
 
             pagination: {
                 currentPage: page,
+
                 totalPages:
-                    Math.ceil(total / limit),
+                    Math.ceil(
+                        total / limit
+                    ),
+
                 limit,
+
                 totalResults: total
             },
 
             filters: {
                 search:
-                    req.query.search || null,
+                    req.query.search ||
+                    null,
 
                 chapterNumber:
                     req.query.chapterNumber ||
@@ -322,14 +434,15 @@ exports.getHSCodes = async (req, res, next) => {
                     null,
 
                 isActive:
-                    req.query.isActive !== undefined
-                        ? req.query.isActive
+                    isAdmin(req)
+                        ? req.query
+                              .isActive ||
+                          true
                         : true
             },
 
             hsCodes
         });
-
     } catch (error) {
         next(error);
     }
@@ -339,8 +452,6 @@ exports.getHSCodes = async (req, res, next) => {
 // SEARCH HS CODES
 //
 // GET /api/v1/hs-codes/search?q=cotton
-//
-// Dedicated search endpoint
 // ======================================================
 
 exports.searchHSCodes = async (
@@ -362,7 +473,9 @@ exports.searchHSCodes = async (
 
         const limit = Math.min(
             Math.max(
-                parseInt(req.query.limit) || 20,
+                parseInt(
+                    req.query.limit
+                ) || 20,
                 1
             ),
             100
@@ -411,6 +524,10 @@ exports.searchHSCodes = async (
                     }
                 ]
             })
+                .populate(
+                    "createdBy",
+                    "fullName email"
+                )
                 .sort({
                     hsCode: 1
                 })
@@ -422,7 +539,6 @@ exports.searchHSCodes = async (
             query: search,
             hsCodes
         });
-
     } catch (error) {
         next(error);
     }
@@ -432,8 +548,6 @@ exports.searchHSCodes = async (
 // GET HS CODE BY ID
 //
 // GET /api/v1/hs-codes/id/:id
-//
-// Public
 // ======================================================
 
 exports.getHSCodeById = async (
@@ -442,7 +556,8 @@ exports.getHSCodeById = async (
     next
 ) => {
     try {
-        const { id } = req.params;
+        const { id } =
+            req.params;
 
         if (!isValidObjectId(id)) {
             return res.status(400).json({
@@ -478,7 +593,6 @@ exports.getHSCodeById = async (
             success: true,
             hsCode
         });
-
     } catch (error) {
         next(error);
     }
@@ -488,8 +602,6 @@ exports.getHSCodeById = async (
 // GET HS CODE BY CODE
 //
 // GET /api/v1/hs-codes/code/:hsCode
-//
-// Public
 // ======================================================
 
 exports.getHSCodeByCode = async (
@@ -499,7 +611,9 @@ exports.getHSCodeByCode = async (
 ) => {
     try {
         const code =
-            req.params.hsCode?.trim();
+            normalizeHSCode(
+                req.params.hsCode
+            );
 
         if (!code) {
             return res.status(400).json({
@@ -535,7 +649,120 @@ exports.getHSCodeByCode = async (
             success: true,
             hsCode
         });
+    } catch (error) {
+        next(error);
+    }
+};
 
+// ======================================================
+// GET MY HS CODES
+//
+// GET /api/v1/hs-codes/my
+//
+// Authenticated user only.
+// ======================================================
+
+exports.getMyHSCodes = async (
+    req,
+    res,
+    next
+) => {
+    try {
+        const userId =
+            getUserId(req);
+
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message:
+                    "User authentication required."
+            });
+        }
+
+        const page = Math.max(
+            parseInt(req.query.page) || 1,
+            1
+        );
+
+        const limit = Math.min(
+            Math.max(
+                parseInt(
+                    req.query.limit
+                ) || 20,
+                1
+            ),
+            100
+        );
+
+        const skip =
+            (page - 1) * limit;
+
+        const query = {
+            createdBy: userId
+        };
+
+        // Optional active filter
+        if (
+            req.query.isActive !==
+            undefined
+        ) {
+            const value = String(
+                req.query.isActive
+            ).toLowerCase();
+
+            if (value === "true") {
+                query.isActive = true;
+            }
+
+            if (value === "false") {
+                query.isActive = false;
+            }
+        }
+
+        const [
+            hsCodes,
+            total
+        ] = await Promise.all([
+            HSCode.find(query)
+                .populate(
+                    "createdBy",
+                    "fullName email"
+                )
+                .populate(
+                    "updatedBy",
+                    "fullName email"
+                )
+                .sort({
+                    createdAt: -1
+                })
+                .skip(skip)
+                .limit(limit),
+
+            HSCode.countDocuments(query)
+        ]);
+
+        return res.status(200).json({
+            success: true,
+
+            count: hsCodes.length,
+
+            total,
+
+            pagination: {
+                currentPage: page,
+
+                totalPages:
+                    Math.ceil(
+                        total / limit
+                    ),
+
+                limit,
+
+                totalResults: total
+            },
+
+            hsCodes
+        });
     } catch (error) {
         next(error);
     }
@@ -546,7 +773,7 @@ exports.getHSCodeByCode = async (
 //
 // POST /api/v1/hs-codes
 //
-// Admin Only
+// Any authenticated user.
 // ======================================================
 
 exports.createHSCode = async (
@@ -555,11 +782,21 @@ exports.createHSCode = async (
     next
 ) => {
     try {
-        // ==========================================
-        // Body Validation
-        // ==========================================
+        const userId =
+            getUserId(req);
 
-        if (!req.body) {
+        if (!userId) {
+            return res.status(401).json({
+                success: false,
+                message:
+                    "User authentication required."
+            });
+        }
+
+        if (
+            !req.body ||
+            typeof req.body !== "object"
+        ) {
             return res.status(400).json({
                 success: false,
                 message:
@@ -584,18 +821,17 @@ exports.createHSCode = async (
             exportPolicy,
             country,
             notes,
-            keywords,
-            isActive
+            keywords
         } = req.body;
 
         // ==========================================
-        // Required Fields
+        // Required fields
         // ==========================================
 
-        if (
-            !hsCode ||
-            !String(hsCode).trim()
-        ) {
+        const normalizedCode =
+            normalizeHSCode(hsCode);
+
+        if (!normalizedCode) {
             return res.status(400).json({
                 success: false,
                 message:
@@ -615,14 +851,28 @@ exports.createHSCode = async (
         }
 
         // ==========================================
-        // Duplicate Check
+        // HS Code format
+        // ==========================================
+
+        if (
+            !/^\d{4,10}$/.test(
+                normalizedCode
+            )
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "HS Code must contain only numbers and be between 4 and 10 digits."
+            });
+        }
+
+        // ==========================================
+        // Duplicate
         // ==========================================
 
         const existing =
             await HSCode.findOne({
-                hsCode: String(
-                    hsCode
-                ).trim()
+                hsCode: normalizedCode
             });
 
         if (existing) {
@@ -640,75 +890,104 @@ exports.createHSCode = async (
 
         const newHSCode =
             await HSCode.create({
-                hsCode:
-                    String(hsCode).trim(),
+                hsCode: normalizedCode,
 
                 description:
-                    String(description).trim(),
+                    String(
+                        description
+                    ).trim(),
 
                 section:
-                    section || "",
+                    section
+                        ? String(section).trim()
+                        : "",
 
                 sectionNumber:
-                    sectionNumber !== undefined &&
-                    sectionNumber !== ""
-                        ? Number(sectionNumber)
-                        : null,
+                    parseOptionalNumber(
+                        sectionNumber
+                    ),
 
                 chapter:
-                    chapter || "",
+                    chapter
+                        ? String(chapter).trim()
+                        : "",
 
                 chapterNumber:
-                    chapterNumber !== undefined &&
-                    chapterNumber !== ""
-                        ? Number(chapterNumber)
-                        : null,
+                    parseOptionalNumber(
+                        chapterNumber
+                    ),
 
                 heading:
-                    heading || "",
+                    heading
+                        ? String(heading).trim()
+                        : "",
 
                 subHeading:
-                    subHeading || "",
+                    subHeading
+                        ? String(
+                              subHeading
+                          ).trim()
+                        : "",
 
                 unit:
-                    unit || "",
+                    unit
+                        ? String(unit).trim()
+                        : "",
 
                 basicDuty:
-                    basicDuty || "",
+                    basicDuty
+                        ? String(
+                              basicDuty
+                          ).trim()
+                        : "",
 
                 igst:
-                    igst || "",
+                    igst
+                        ? String(igst).trim()
+                        : "",
 
                 cess:
-                    cess || "",
+                    cess
+                        ? String(cess).trim()
+                        : "",
 
                 importPolicy:
-                    importPolicy || "",
+                    importPolicy
+                        ? String(
+                              importPolicy
+                          ).trim()
+                        : "",
 
                 exportPolicy:
-                    exportPolicy || "",
+                    exportPolicy
+                        ? String(
+                              exportPolicy
+                          ).trim()
+                        : "",
 
                 country:
-                    country || "India",
+                    country
+                        ? String(country).trim()
+                        : "India",
 
                 notes:
-                    notes || "",
+                    notes
+                        ? String(notes).trim()
+                        : "",
 
                 keywords:
                     normalizeKeywords(
                         keywords
                     ),
 
-                isActive:
-                    isActive !== undefined
-                        ? Boolean(isActive)
-                        : true,
+                // Every successful submission
+                // becomes immediately active.
+                isActive: true,
 
-                createdBy:
-                    req.user.userId,
+                // Ownership
+                createdBy: userId,
 
-                updatedBy:
-                    req.user.userId
+                updatedBy: userId
             });
 
         // ==========================================
@@ -730,12 +1009,24 @@ exports.createHSCode = async (
 
         return res.status(201).json({
             success: true,
+
             message:
                 "HS Code created successfully.",
+
             hsCode: newHSCode
         });
-
     } catch (error) {
+        // Duplicate index protection
+        if (
+            error?.code === 11000
+        ) {
+            return res.status(409).json({
+                success: false,
+                message:
+                    "This HS Code already exists."
+            });
+        }
+
         next(error);
     }
 };
@@ -745,7 +1036,7 @@ exports.createHSCode = async (
 //
 // PUT /api/v1/hs-codes/:id
 //
-// Admin Only
+// Owner OR Admin.
 // ======================================================
 
 exports.updateHSCode = async (
@@ -754,7 +1045,8 @@ exports.updateHSCode = async (
     next
 ) => {
     try {
-        const { id } = req.params;
+        const { id } =
+            req.params;
 
         if (!isValidObjectId(id)) {
             return res.status(400).json({
@@ -764,7 +1056,10 @@ exports.updateHSCode = async (
             });
         }
 
-        if (!req.body) {
+        if (
+            !req.body ||
+            typeof req.body !== "object"
+        ) {
             return res.status(400).json({
                 success: false,
                 message:
@@ -784,16 +1079,50 @@ exports.updateHSCode = async (
         }
 
         // ==========================================
-        // Prevent Duplicate HS Code
+        // Ownership check
         // ==========================================
 
-        if (req.body.hsCode) {
+        if (
+            !canModifyHSCode(
+                req,
+                existing
+            )
+        ) {
+            return res.status(403).json({
+                success: false,
+                message:
+                    "You are not allowed to update this HS Code."
+            });
+        }
+
+        // ==========================================
+        // Duplicate HS Code
+        // ==========================================
+
+        if (
+            req.body.hsCode !==
+            undefined
+        ) {
+            const newCode =
+                normalizeHSCode(
+                    req.body.hsCode
+                );
+
+            if (
+                !/^\d{4,10}$/.test(
+                    newCode
+                )
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        "HS Code must contain only numbers and be between 4 and 10 digits."
+                });
+            }
+
             const duplicate =
                 await HSCode.findOne({
-                    hsCode:
-                        String(
-                            req.body.hsCode
-                        ).trim(),
+                    hsCode: newCode,
 
                     _id: {
                         $ne: id
@@ -807,19 +1136,19 @@ exports.updateHSCode = async (
                         "Another HS Code with this code already exists."
                 });
             }
+
+            existing.hsCode =
+                newCode;
         }
 
         // ==========================================
-        // Allowed Fields
+        // Allowed fields
         // ==========================================
 
-        const allowedFields = [
-            "hsCode",
+        const stringFields = [
             "description",
             "section",
-            "sectionNumber",
             "chapter",
-            "chapterNumber",
             "heading",
             "subHeading",
             "unit",
@@ -829,67 +1158,127 @@ exports.updateHSCode = async (
             "importPolicy",
             "exportPolicy",
             "country",
-            "notes",
-            "keywords",
-            "isActive"
+            "notes"
         ];
 
-        allowedFields.forEach(
+        stringFields.forEach(
             (field) => {
                 if (
                     req.body[field] !==
                     undefined
                 ) {
-                    if (
-                        field ===
-                        "keywords"
-                    ) {
-                        existing[field] =
-                            normalizeKeywords(
-                                req.body[field]
-                            );
-                    } else if (
-                        field ===
-                            "sectionNumber" ||
-                        field ===
-                            "chapterNumber"
-                    ) {
-                        existing[field] =
-                            req.body[field] !==
-                                "" &&
-                            req.body[field] !==
-                                null
-                                ? Number(
-                                      req.body[
-                                          field
-                                      ]
-                                  )
-                                : null;
-                    } else if (
-                        typeof req.body[
-                            field
-                        ] === "string"
-                    ) {
-                        existing[field] =
-                            req.body[
-                                field
-                            ].trim();
-                    } else {
-                        existing[field] =
-                            req.body[field];
-                    }
+                    existing[field] =
+                        String(
+                            req.body[field]
+                        ).trim();
                 }
             }
         );
+
+        // ==========================================
+        // Description validation
+        // ==========================================
+
+        if (
+            !existing.description ||
+            !existing.description.trim()
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Description is required."
+            });
+        }
+
+        // ==========================================
+        // Number fields
+        // ==========================================
+
+        if (
+            req.body.sectionNumber !==
+            undefined
+        ) {
+            existing.sectionNumber =
+                parseOptionalNumber(
+                    req.body.sectionNumber
+                );
+        }
+
+        if (
+            req.body.chapterNumber !==
+            undefined
+        ) {
+            existing.chapterNumber =
+                parseOptionalNumber(
+                    req.body.chapterNumber
+                );
+        }
+
+        // ==========================================
+        // Keywords
+        // ==========================================
+
+        if (
+            req.body.keywords !==
+            undefined
+        ) {
+            existing.keywords =
+                normalizeKeywords(
+                    req.body.keywords
+                );
+        }
+
+        // ==========================================
+        // isActive
+        //
+        // Owner can change own active status.
+        // Admin can also change it.
+        // ==========================================
+
+        if (
+            req.body.isActive !==
+            undefined
+        ) {
+            if (
+                typeof req.body.isActive ===
+                "boolean"
+            ) {
+                existing.isActive =
+                    req.body.isActive;
+            } else {
+                const value =
+                    String(
+                        req.body.isActive
+                    ).toLowerCase();
+
+                if (
+                    value === "true"
+                ) {
+                    existing.isActive =
+                        true;
+                }
+
+                if (
+                    value === "false"
+                ) {
+                    existing.isActive =
+                        false;
+                }
+            }
+        }
 
         // ==========================================
         // Updated By
         // ==========================================
 
         existing.updatedBy =
-            req.user.userId;
+            getUserId(req);
 
         await existing.save();
+
+        // ==========================================
+        // Populate
+        // ==========================================
 
         await existing.populate([
             {
@@ -906,12 +1295,23 @@ exports.updateHSCode = async (
 
         return res.status(200).json({
             success: true,
+
             message:
                 "HS Code updated successfully.",
+
             hsCode: existing
         });
-
     } catch (error) {
+        if (
+            error?.code === 11000
+        ) {
+            return res.status(409).json({
+                success: false,
+                message:
+                    "This HS Code already exists."
+            });
+        }
+
         next(error);
     }
 };
@@ -921,7 +1321,7 @@ exports.updateHSCode = async (
 //
 // PATCH /api/v1/hs-codes/:id/deactivate
 //
-// Admin Only
+// Owner OR Admin.
 // ======================================================
 
 exports.deactivateHSCode = async (
@@ -930,7 +1330,8 @@ exports.deactivateHSCode = async (
     next
 ) => {
     try {
-        const { id } = req.params;
+        const { id } =
+            req.params;
 
         if (!isValidObjectId(id)) {
             return res.status(400).json({
@@ -948,6 +1349,19 @@ exports.deactivateHSCode = async (
                 success: false,
                 message:
                     "HS Code not found."
+            });
+        }
+
+        if (
+            !canModifyHSCode(
+                req,
+                hsCode
+            )
+        ) {
+            return res.status(403).json({
+                success: false,
+                message:
+                    "You are not allowed to deactivate this HS Code."
             });
         }
 
@@ -959,31 +1373,33 @@ exports.deactivateHSCode = async (
             });
         }
 
-        hsCode.isActive = false;
+        hsCode.isActive =
+            false;
 
         hsCode.updatedBy =
-            req.user.userId;
+            getUserId(req);
 
         await hsCode.save();
 
         return res.status(200).json({
             success: true,
+
             message:
                 "HS Code deactivated successfully.",
+
             hsCode
         });
-
     } catch (error) {
         next(error);
     }
 };
 
 // ======================================================
-// REACTIVATE HS CODE
+// ACTIVATE HS CODE
 //
 // PATCH /api/v1/hs-codes/:id/activate
 //
-// Admin Only
+// Owner OR Admin.
 // ======================================================
 
 exports.activateHSCode = async (
@@ -992,7 +1408,8 @@ exports.activateHSCode = async (
     next
 ) => {
     try {
-        const { id } = req.params;
+        const { id } =
+            req.params;
 
         if (!isValidObjectId(id)) {
             return res.status(400).json({
@@ -1010,6 +1427,19 @@ exports.activateHSCode = async (
                 success: false,
                 message:
                     "HS Code not found."
+            });
+        }
+
+        if (
+            !canModifyHSCode(
+                req,
+                hsCode
+            )
+        ) {
+            return res.status(403).json({
+                success: false,
+                message:
+                    "You are not allowed to activate this HS Code."
             });
         }
 
@@ -1021,31 +1451,33 @@ exports.activateHSCode = async (
             });
         }
 
-        hsCode.isActive = true;
+        hsCode.isActive =
+            true;
 
         hsCode.updatedBy =
-            req.user.userId;
+            getUserId(req);
 
         await hsCode.save();
 
         return res.status(200).json({
             success: true,
+
             message:
                 "HS Code activated successfully.",
+
             hsCode
         });
-
     } catch (error) {
         next(error);
     }
 };
 
 // ======================================================
-// HARD DELETE HS CODE
+// DELETE HS CODE
 //
 // DELETE /api/v1/hs-codes/:id
 //
-// Admin Only
+// Owner OR Admin.
 // ======================================================
 
 exports.deleteHSCode = async (
@@ -1054,7 +1486,8 @@ exports.deleteHSCode = async (
     next
 ) => {
     try {
-        const { id } = req.params;
+        const { id } =
+            req.params;
 
         if (!isValidObjectId(id)) {
             return res.status(400).json({
@@ -1075,14 +1508,31 @@ exports.deleteHSCode = async (
             });
         }
 
+        // ==========================================
+        // Ownership
+        // ==========================================
+
+        if (
+            !canModifyHSCode(
+                req,
+                hsCode
+            )
+        ) {
+            return res.status(403).json({
+                success: false,
+                message:
+                    "You are not allowed to delete this HS Code."
+            });
+        }
+
         await hsCode.deleteOne();
 
         return res.status(200).json({
             success: true,
+
             message:
                 "HS Code deleted permanently."
         });
-
     } catch (error) {
         next(error);
     }
