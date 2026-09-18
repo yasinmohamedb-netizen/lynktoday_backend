@@ -1,7 +1,313 @@
 const express = require("express");
+const { google } = require("googleapis");
 const { sendEmail } = require("../services/emailService");
 
 const router = express.Router();
+
+// ============================================================
+// GOOGLE OAUTH CONFIGURATION
+// ============================================================
+
+const GOOGLE_SCOPE =
+    "https://www.googleapis.com/auth/gmail.send";
+
+const GOOGLE_REDIRECT_URI =
+    process.env.GOOGLE_REDIRECT_URI ||
+    "http://localhost:5001/api/v1/email/google-callback";
+
+const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    GOOGLE_REDIRECT_URI
+);
+
+// ============================================================
+// GOOGLE OAUTH - START AUTHORIZATION
+//
+// GET /api/v1/email/google-auth
+// ============================================================
+
+router.get("/google-auth", (req, res) => {
+    try {
+        const authUrl = oauth2Client.generateAuthUrl({
+            access_type: "offline",
+
+            // Force Google to show the consent screen again.
+            // This is useful for recording the verification video.
+            prompt: "consent",
+
+            scope: [GOOGLE_SCOPE],
+
+            include_granted_scopes: true,
+        });
+
+        console.log("========================================");
+        console.log("🔐 GOOGLE OAUTH START");
+        console.log("Redirect URI:", GOOGLE_REDIRECT_URI);
+        console.log("Scope:", GOOGLE_SCOPE);
+        console.log("========================================");
+
+        return res.redirect(authUrl);
+
+    } catch (error) {
+
+        console.error(
+            "❌ Google OAuth start error:",
+            error?.response?.data ||
+            error?.message ||
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to start Google authorization",
+        });
+    }
+});
+
+// ============================================================
+// GOOGLE OAUTH - CALLBACK
+//
+// GET /api/v1/email/google-callback
+// ============================================================
+
+router.get("/google-callback", async (req, res) => {
+    try {
+        const { code, error } = req.query;
+
+        // --------------------------------------------------------
+        // GOOGLE RETURNED AN ERROR
+        // --------------------------------------------------------
+
+        if (error) {
+
+            console.error(
+                "❌ Google OAuth error:",
+                error
+            );
+
+            return res.status(400).send(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>LynkToday OAuth</title>
+                </head>
+
+                <body
+                    style="
+                        font-family:Arial,Helvetica,sans-serif;
+                        padding:40px;
+                    "
+                >
+
+                    <h2>Google Authorization Failed</h2>
+
+                    <p>
+                        Google returned:
+                        <strong>${String(error)}</strong>
+                    </p>
+
+                </body>
+                </html>
+            `);
+        }
+
+        // --------------------------------------------------------
+        // NO AUTHORIZATION CODE
+        // --------------------------------------------------------
+
+        if (!code) {
+
+            return res.status(400).send(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>LynkToday OAuth</title>
+                </head>
+
+                <body
+                    style="
+                        font-family:Arial,Helvetica,sans-serif;
+                        padding:40px;
+                    "
+                >
+
+                    <h2>Authorization Code Missing</h2>
+
+                    <p>
+                        Google did not return an authorization code.
+                    </p>
+
+                </body>
+                </html>
+            `);
+        }
+
+        // --------------------------------------------------------
+        // EXCHANGE AUTHORIZATION CODE FOR TOKENS
+        // --------------------------------------------------------
+
+        const { tokens } =
+            await oauth2Client.getToken(code);
+
+        // --------------------------------------------------------
+        // LOG IMPORTANT INFORMATION
+        // --------------------------------------------------------
+
+        console.log("");
+        console.log("========================================");
+        console.log("✅ GOOGLE OAUTH AUTHORIZATION SUCCESS");
+        console.log("========================================");
+
+        console.log(
+            "Scope:",
+            tokens.scope || GOOGLE_SCOPE
+        );
+
+        console.log(
+            "Access token received:",
+            !!tokens.access_token
+        );
+
+        console.log(
+            "Refresh token received:",
+            !!tokens.refresh_token
+        );
+
+        console.log(
+            "Token expiry:",
+            tokens.expiry_date || null
+        );
+
+        console.log("========================================");
+        console.log("");
+
+        // --------------------------------------------------------
+        // IMPORTANT:
+        // DO NOT DISPLAY THE ACTUAL TOKEN IN THE BROWSER.
+        // --------------------------------------------------------
+
+        return res.send(`
+            <!DOCTYPE html>
+            <html>
+
+            <head>
+                <meta charset="UTF-8" />
+
+                <meta
+                    name="viewport"
+                    content="width=device-width, initial-scale=1.0"
+                />
+
+                <title>
+                    LynkToday - Google Authorization
+                </title>
+            </head>
+
+            <body
+                style="
+                    margin:0;
+                    padding:40px;
+                    background:#f5f7fa;
+                    font-family:Arial,Helvetica,sans-serif;
+                "
+            >
+
+                <div
+                    style="
+                        max-width:600px;
+                        margin:50px auto;
+                        background:white;
+                        padding:40px;
+                        border-radius:12px;
+                        box-shadow:0 4px 20px rgba(0,0,0,0.08);
+                    "
+                >
+
+                    <h1
+                        style="
+                            color:#3B5B7A;
+                            margin-top:0;
+                        "
+                    >
+                        Google Authorization Successful
+                    </h1>
+
+                    <p>
+                        LynkToday has successfully received
+                        authorization to send email using Gmail.
+                    </p>
+
+                    <p>
+                        <strong>Requested scope:</strong>
+                    </p>
+
+                    <p
+                        style="
+                            word-break:break-all;
+                            background:#f5f5f5;
+                            padding:12px;
+                            border-radius:6px;
+                        "
+                    >
+                        ${GOOGLE_SCOPE}
+                    </p>
+
+                    <p
+                        style="
+                            color:#555;
+                            margin-top:25px;
+                        "
+                    >
+                        You can close this window.
+                    </p>
+
+                </div>
+
+            </body>
+
+            </html>
+        `);
+
+    } catch (error) {
+
+        console.error(
+            "❌ Google OAuth callback error:",
+            error?.response?.data ||
+            error?.message ||
+            error
+        );
+
+        return res.status(500).send(`
+            <!DOCTYPE html>
+            <html>
+
+            <head>
+                <title>LynkToday OAuth Error</title>
+            </head>
+
+            <body
+                style="
+                    font-family:Arial,Helvetica,sans-serif;
+                    padding:40px;
+                "
+            >
+
+                <h2>
+                    Google Authorization Failed
+                </h2>
+
+                <p>
+                    Please check the backend terminal
+                    for the error details.
+                </p>
+
+            </body>
+
+            </html>
+        `);
+    }
+});
 
 // ============================================================
 // TEST EMAIL
@@ -42,10 +348,18 @@ router.post("/test-email", async (req, res) => {
             html: `
                 <!DOCTYPE html>
                 <html>
+
                 <head>
                     <meta charset="UTF-8" />
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                    <title>LynkToday Gmail Test</title>
+
+                    <meta
+                        name="viewport"
+                        content="width=device-width, initial-scale=1.0"
+                    />
+
+                    <title>
+                        LynkToday Gmail Test
+                    </title>
                 </head>
 
                 <body
@@ -110,12 +424,14 @@ router.post("/test-email", async (req, res) => {
                                 font-size:13px;
                             "
                         >
-                            This is an automated test email from LynkToday.
+                            This is an automated test email
+                            from LynkToday.
                         </div>
 
                     </div>
 
                 </body>
+
                 </html>
             `,
         });
@@ -148,9 +464,9 @@ router.post("/test-email", async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Failed to send email",
+
             error:
                 error?.response?.data ||
-                error?.response?.data?.error ||
                 error?.message ||
                 "Unknown email error",
         });
