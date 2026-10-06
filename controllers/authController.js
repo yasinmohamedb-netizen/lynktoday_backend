@@ -504,6 +504,7 @@ exports.signup = async (
             fullName,
             email,
             password,
+            accountType,
             companyName,
             profession,
             designation,
@@ -680,6 +681,11 @@ exports.signup = async (
 
                 fullName:
                     fullName.trim(),
+
+                accountType:
+                    accountType === "company"
+                        ? "company"
+                        : "individual",
 
                 email:
                     normalizedEmail,
