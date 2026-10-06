@@ -506,6 +506,8 @@ exports.signup = async (
             password,
             companyName,
             profession,
+            designation,
+            bio,
             location,
             tradeIntent,
             agreeToTerms
@@ -689,6 +691,12 @@ exports.signup = async (
 
                 profession:
                     profession || "",
+
+                designation:
+                    designation || "",
+
+                bio:
+                    bio || "",
 
                 location:
                     location || "",
