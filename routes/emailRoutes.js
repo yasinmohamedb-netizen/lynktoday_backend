@@ -1,6 +1,7 @@
 const express = require("express");
 const { google } = require("googleapis");
 const { sendEmail } = require("../services/emailService");
+const { saveGoogleRefreshToken } = require("../utils/googleTokenStore");
 
 const router = express.Router();
 
@@ -177,6 +178,20 @@ router.get("/google-callback", async (req, res) => {
         console.log(
             "Token expiry:",
             tokens.expiry_date || null
+        );
+
+        if (!tokens.refresh_token) {
+            throw new Error(
+                "Google did not return a refresh token. Re-authorize Gmail with consent."
+            );
+        }
+
+        await saveGoogleRefreshToken(
+            tokens.refresh_token
+        );
+
+        console.log(
+            "Google refresh token stored securely."
         );
 
         console.log("========================================");
