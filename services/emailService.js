@@ -1,4 +1,4 @@
-const { gmail } = require("../utils/gmail");
+const { getGmail } = require("../utils/gmail");
 
 const FROM_EMAIL = "lynktodayinfo@gmail.com";
 const FROM_NAME = "LynkToday";
@@ -93,6 +93,8 @@ async function sendEmail({
         // ------------------------------------------------------
         // SEND THROUGH GMAIL API
         // ------------------------------------------------------
+
+        const gmail = await getGmail();
 
         const response =
             await gmail.users.messages.send({
