@@ -38,6 +38,7 @@ const PostSchema = new mongoose.Schema(
             type: String,
             enum: [
                 "QUESTION",
+                "TRADE_REQUEST",
                 "DISCUSSION",
                 "NEWS",
                 "CASE_STUDY",
