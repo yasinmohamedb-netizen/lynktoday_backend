@@ -886,26 +886,6 @@ exports.searchUsers = async (
 
         }
 
-        // Location filter
-        if (location) {
-
-            const escapedLocation =
-                location.replace(
-                    /[.*+?^$()|[\\]\\]/g,
-                    "\\        if (profession) {
-
-            filter.profession =
-                profession;
-
-        }"
-                );
-
-            filter.location =
-                new RegExp(escapedLocation, "i");
-
-        }
-
-
         // ==================================================
         // Text Search
         // ==================================================
