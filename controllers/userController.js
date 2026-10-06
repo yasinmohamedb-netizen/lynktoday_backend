@@ -806,6 +806,11 @@ exports.searchUsers = async (
                 ? req.query.profession.trim()
                 : "";
 
+        const location =
+            typeof req.query.location === "string"
+                ? req.query.location.trim()
+                : "";
+
 
         // ==================================================
         // Pagination
@@ -878,6 +883,25 @@ exports.searchUsers = async (
 
             filter.profession =
                 profession;
+
+        }
+
+        // Location filter
+        if (location) {
+
+            const escapedLocation =
+                location.replace(
+                    /[.*+?^$()|[\\]\\]/g,
+                    "\\        if (profession) {
+
+            filter.profession =
+                profession;
+
+        }"
+                );
+
+            filter.location =
+                new RegExp(escapedLocation, "i");
 
         }
 
