@@ -184,10 +184,234 @@ exports.getRightSidebar = async (
         // ==================================================
         // 1. TRENDING TOPICS
         // ==================================================
+        //
+        // Trending topics are generated from the same live
+        // trade knowledge already stored in LynkToday:
+        // posts, documentation and HS-code data.
+        //
+        // Related keywords are grouped into one canonical
+        // topic. For example:
+        // import / importer / importing / import duty /
+        // import clearance / bill of entry all contribute
+        // to #Import instead of becoming separate topics.
+        //
 
-        const topicMap =
-            new Map();
+        const TOPIC_GROUPS = [
+            {
+                name: "Import",
+                aliases: ["import", "imports", "importer", "importers", "importing", "imported", "import clearance", "import duty", "bill of entry"]
+            },
+            {
+                name: "Export",
+                aliases: ["export", "exports", "exporter", "exporters", "exporting", "exported", "export clearance", "export duty", "shipping bill"]
+            },
+            {
+                name: "Customs Clearance",
+                aliases: ["customs", "customs clearance", "custom clearance", "clearance", "customs broker", "customs brokers", "cha", "cbl"]
+            },
+            {
+                name: "Freight Forwarding",
+                aliases: ["freight forwarding", "freight forwarder", "freight forwarders", "forwarding", "forwarder", "forwarders"]
+            },
+            {
+                name: "Shipping",
+                aliases: ["shipping", "shipments", "shipment", "shipping line", "shipping lines", "vessel", "vessels", "port", "ports"]
+            },
+            {
+                name: "Logistics",
+                aliases: ["logistics", "logistic", "supply chain", "supply-chain", "3pl", "4pl"]
+            },
+            {
+                name: "Sea Freight",
+                aliases: ["sea freight", "ocean freight", "ocean shipping", "fcl", "lcl", "container freight"]
+            },
+            {
+                name: "Air Freight",
+                aliases: ["air freight", "air cargo", "air shipment", "air waybill", "awb"]
+            },
+            {
+                name: "Road Transport",
+                aliases: ["road transport", "road freight", "trucking", "truck", "trucks", "transport"]
+            },
+            {
+                name: "Warehousing",
+                aliases: ["warehouse", "warehouses", "warehousing", "storage", "fulfilment", "fulfillment"]
+            },
+            {
+                name: "HS Code",
+                aliases: ["hs code", "hs codes", "hscode", "tariff heading", "tariff headings", "classification", "classification code"]
+            },
+            {
+                name: "DGFT",
+                aliases: ["dgft", "directorate general of foreign trade", "iec", "import export code", "foreign trade policy"]
+            },
+            {
+                name: "GST",
+                aliases: ["gst", "igst", "cgst", "sgst", "input tax credit", "itc", "lut", "letter of undertaking"]
+            },
+            {
+                name: "Incoterms",
+                aliases: ["incoterms", "exw", "fob", "cif", "dap", "ddp", "fca", "cpt", "cip"]
+            },
+            {
+                name: "Documentation",
+                aliases: ["documentation", "documents", "commercial invoice", "packing list", "bill of lading", "certificate of origin", "coo"]
+            },
+            {
+                name: "Dangerous Goods",
+                aliases: ["dangerous goods", "dg cargo", "hazardous cargo", "hazmat", "imo class"]
+            },
+            {
+                name: "Trade Finance",
+                aliases: ["trade finance", "letter of credit", "lc", "bank guarantee", "documentary credit"]
+            },
+            {
+                name: "Container",
+                aliases: ["container", "containers", "containerization", "20ft", "40ft", "teu", "feu"]
+            },
+            {
+                name: "Global Trade",
+                aliases: ["global trade", "international trade", "world trade", "cross border", "cross-border", "trade policy", "trade agreement"]
+            }
+        ];
 
+        const topicMap = new Map();
+
+        const normalizeTopicText = (value) =>
+            String(value || "")
+                .toLowerCase()
+                .replace(/[#_/-]+/g, " ")
+                .replace(/\\s+/g, " ")
+                .trim();
+
+        const addCanonicalTopic = (
+            name,
+            source,
+            weight = 1,
+            matches = 1
+        ) => {
+            const key = normalizeTopicText(name);
+
+            if (!key) {
+                return;
+            }
+
+            if (!topicMap.has(key)) {
+                topicMap.set(key, {
+                    name: `#${name}`,
+                    slug: createSlug(name),
+                    score: 0,
+                    sources: {
+                        posts: 0,
+                        documents: 0,
+                        hsCodes: 0
+                    }
+                });
+            }
+
+            const topic = topicMap.get(key);
+
+            topic.score += Math.min(5, Math.max(1, matches)) * weight;
+
+            if (source === "post") {
+                topic.sources.posts += 1;
+            }
+
+            if (source === "document") {
+                topic.sources.documents += 1;
+            }
+
+            if (source === "hsCode") {
+                topic.sources.hsCodes += 1;
+            }
+        };
+
+        const processTopicSource = (
+            fields,
+            source,
+            weight
+        ) => {
+            const text = normalizeTopicText(
+                Array.isArray(fields)
+                    ? fields.join(" ")
+                    : fields
+            );
+
+            if (!text) {
+                return;
+            }
+
+            TOPIC_GROUPS.forEach(topic => {
+                let matches = 0;
+
+                topic.aliases.forEach(alias => {
+                    const normalizedAlias =
+                        normalizeTopicText(alias);
+
+                    if (
+                        normalizedAlias &&
+                        text.includes(normalizedAlias)
+                    ) {
+                        matches += 1;
+                    }
+                });
+
+                if (matches > 0) {
+                    addCanonicalTopic(
+                        topic.name,
+                        source,
+                        weight,
+                        matches
+                    );
+                }
+            });
+
+            // Also support user/admin hashtags and useful custom tags.
+            const hashtags =
+                text.match(/#[a-z0-9][a-z0-9_-]{2,40}/g) || [];
+
+            hashtags.forEach(tag => {
+                const raw = tag
+                    .replace(/^#/, "")
+                    .replace(/[-_]+/g, " ")
+                    .trim();
+
+                if (!raw) {
+                    return;
+                }
+
+                const matchedGroup =
+                    TOPIC_GROUPS.find(topic =>
+                        topic.aliases.some(alias =>
+                            normalizeTopicText(alias) ===
+                            normalizeTopicText(raw)
+                        )
+                    );
+
+                if (matchedGroup) {
+                    addCanonicalTopic(
+                        matchedGroup.name,
+                        source,
+                        weight,
+                        1
+                    );
+                } else {
+                    addCanonicalTopic(
+                        raw
+                            .split(" ")
+                            .map(word =>
+                                word
+                                    ? word.charAt(0).toUpperCase() + word.slice(1)
+                                    : word
+                            )
+                            .join(" "),
+                        source,
+                        weight,
+                        1
+                    );
+                }
+            });
+        };
 
         // --------------------------------------------------
         // POSTS
@@ -195,84 +419,40 @@ exports.getRightSidebar = async (
 
         const postsForTopics =
             await Post.find({
-
                 status: "ACTIVE",
-
                 visibility: "PUBLIC"
-
             })
-
                 .select(
-                    "category tags createdAt"
+                    "title content category tags createdAt likes views commentCount shareCount"
                 )
-
                 .sort({
-
                     createdAt: -1
-
                 })
-
-                .limit(300)
-
+                .limit(500)
                 .lean();
 
+        postsForTopics.forEach(post => {
+            const engagement =
+                (Array.isArray(post.likes) ? post.likes.length : 0) +
+                (Number(post.commentCount) || 0) +
+                (Number(post.shareCount) || 0);
 
-        postsForTopics.forEach(
-            post => {
+            const weight =
+                engagement >= 5 ? 3 :
+                engagement >= 2 ? 2 :
+                1;
 
-
-                // ------------------------------------------
-                // CATEGORY
-                // ------------------------------------------
-
-                if (
-                    post.category
-                ) {
-
-                    addTopic(
-
-                        topicMap,
-
-                        post.category,
-
-                        "post"
-
-                    );
-
-                }
-
-
-                // ------------------------------------------
-                // TAGS
-                // ------------------------------------------
-
-                if (
-                    Array.isArray(
-                        post.tags
-                    )
-                ) {
-
-                    post.tags.forEach(
-                        tag => {
-
-                            addTopic(
-
-                                topicMap,
-
-                                tag,
-
-                                "post"
-
-                            );
-
-                        }
-                    );
-
-                }
-
-            }
-        );
-
+            processTopicSource(
+                [
+                    post.title,
+                    post.content,
+                    post.category,
+                    ...(Array.isArray(post.tags) ? post.tags : [])
+                ],
+                "post",
+                weight
+            );
+        });
 
         // --------------------------------------------------
         // DOCUMENTATION
@@ -280,82 +460,31 @@ exports.getRightSidebar = async (
 
         const documentsForTopics =
             await Documentation.find({
-
                 isActive: true
-
             })
-
                 .select(
-                    "category tags title createdAt"
+                    "category tags title description content hsCode createdAt"
                 )
-
                 .sort({
-
                     createdAt: -1
-
                 })
-
-                .limit(300)
-
+                .limit(500)
                 .lean();
 
-
-        documentsForTopics.forEach(
-            document => {
-
-
-                // ------------------------------------------
-                // CATEGORY
-                // ------------------------------------------
-
-                if (
-                    document.category
-                ) {
-
-                    addTopic(
-
-                        topicMap,
-
-                        document.category,
-
-                        "document"
-
-                    );
-
-                }
-
-
-                // ------------------------------------------
-                // TAGS
-                // ------------------------------------------
-
-                if (
-                    Array.isArray(
-                        document.tags
-                    )
-                ) {
-
-                    document.tags.forEach(
-                        tag => {
-
-                            addTopic(
-
-                                topicMap,
-
-                                tag,
-
-                                "document"
-
-                            );
-
-                        }
-                    );
-
-                }
-
-            }
-        );
-
+        documentsForTopics.forEach(document => {
+            processTopicSource(
+                [
+                    document.title,
+                    document.description,
+                    document.content,
+                    document.category,
+                    document.hsCode,
+                    ...(Array.isArray(document.tags) ? document.tags : [])
+                ],
+                "document",
+                2
+            );
+        });
 
         // --------------------------------------------------
         // HS CODES
@@ -363,164 +492,59 @@ exports.getRightSidebar = async (
 
         const hsCodesForTopics =
             await HSCode.find({
-
                 isActive: true
-
             })
-
                 .select(
-                    "chapter description keywords"
+                    "hsCode description section chapter heading subHeading importPolicy exportPolicy notes keywords"
                 )
-
                 .sort({
-
                     createdAt: -1
-
                 })
-
-                .limit(300)
-
+                .limit(500)
                 .lean();
 
-
-        hsCodesForTopics.forEach(
-            hs => {
-
-
-                // ------------------------------------------
-                // CHAPTER
-                // ------------------------------------------
-
-                if (
-                    hs.chapter
-                ) {
-
-                    addTopic(
-
-                        topicMap,
-
-                        hs.chapter,
-
-                        "hsCode"
-
-                    );
-
-                }
-
-
-                // ------------------------------------------
-                // KEYWORDS
-                // ------------------------------------------
-
-                if (
-                    Array.isArray(
-                        hs.keywords
-                    )
-                ) {
-
-                    hs.keywords.forEach(
-                        keyword => {
-
-                            addTopic(
-
-                                topicMap,
-
-                                keyword,
-
-                                "hsCode"
-
-                            );
-
-                        }
-                    );
-
-                }
-
-            }
-        );
-
+        hsCodesForTopics.forEach(hs => {
+            processTopicSource(
+                [
+                    hs.hsCode,
+                    hs.description,
+                    hs.section,
+                    hs.chapter,
+                    hs.heading,
+                    hs.subHeading,
+                    hs.importPolicy,
+                    hs.exportPolicy,
+                    hs.notes,
+                    ...(Array.isArray(hs.keywords) ? hs.keywords : [])
+                ],
+                "hsCode",
+                1
+            );
+        });
 
         // --------------------------------------------------
         // FINAL TRENDING TOPICS
         // --------------------------------------------------
 
         const trendingTopics =
-        Array.from(
-            topicMap.values()
-        )
-            .filter(topic => {
-    
-                const name =
-                    String(
-                        topic.name || ""
-                    ).trim();
-    
-                const normalized =
-                    name.toLowerCase();
-    
-                // Remove useless / generic topics
-                const blockedTopics = [
-                    "general",
-                    "test",
-                    "testing",
-                    "new",
-                    "hello",
-                    "hi",
-                    "hey"
-                ];
-    
-                if (
-                    blockedTopics.includes(
-                        normalized
-                    )
-                ) {
-                    return false;
-                }
-    
-                // Ignore extremely long descriptions.
-                // These are usually full HS-code descriptions.
-                if (
-                    name.length > 45
-                ) {
-                    return false;
-                }
-    
-                // Ignore topics with no activity.
-                if (
-                    Number(topic.score || 0) < 1
-                ) {
-                    return false;
-                }
-    
-                return true;
-    
-            })
-            .sort(
-                (a, b) => {
-    
+            Array.from(topicMap.values())
+                .filter(topic =>
+                    Number(topic.score || 0) >= 2
+                )
+                .sort((a, b) => {
                     const scoreDifference =
                         Number(b.score || 0) -
                         Number(a.score || 0);
-    
-                    if (
-                        scoreDifference !== 0
-                    ) {
+
+                    if (scoreDifference !== 0) {
                         return scoreDifference;
                     }
-    
-                    return String(a.name)
-                        .localeCompare(
-                            String(b.name)
-                        );
-    
-                }
-            )
-            .slice(
-                0,
-                8
-            );
 
-        // ==================================================
+                    return String(a.name)
+                        .localeCompare(String(b.name));
+                })
+                .slice(0, 8);
+
         // 2. INDUSTRY POSTS
         // ==================================================
         //
