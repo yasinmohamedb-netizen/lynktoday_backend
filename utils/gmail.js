@@ -1,37 +1,29 @@
 const { google } = require("googleapis");
 
-// ============================================================
-// GOOGLE OAUTH2 CLIENT
-// ============================================================
+const {
+    getGoogleRefreshToken
+} = require("./googleTokenStore");
 
 const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET
 );
 
-// ============================================================
-// SET REFRESH TOKEN
-// ============================================================
+async function getGmail() {
+    const refreshToken =
+        await getGoogleRefreshToken();
 
-oauth2Client.setCredentials({
-    refresh_token:
-        process.env.GOOGLE_REFRESH_TOKEN,
-});
+    oauth2Client.setCredentials({
+        refresh_token: refreshToken
+    });
 
-// ============================================================
-// GMAIL API CLIENT
-// ============================================================
-
-const gmail = google.gmail({
-    version: "v1",
-    auth: oauth2Client,
-});
-
-// ============================================================
-// EXPORT
-// ============================================================
+    return google.gmail({
+        version: "v1",
+        auth: oauth2Client
+    });
+}
 
 module.exports = {
     oauth2Client,
-    gmail,
+    getGmail
 };
